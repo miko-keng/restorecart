@@ -33,7 +33,7 @@ flowchart TB
     API --> Checkout
     API --> Payments
     API --> Recovery
-    Catalog <-->|"Bounded AI requests; validated responses"| Gemini
+    Catalog <-->|"Bounded AI requests and validated responses"| Gemini
     API <-->|"Explicit review or explanation request"| Gemini
     Catalog <--> DB
     Checkout <--> DB
@@ -73,7 +73,7 @@ sequenceDiagram
     Server->>DB: Save draft or cache validated suggestions
     Server-->>UI: Show conflicts and missing information
     Seller->>UI: Confirm price, physical count, allocation and pickup details
-    UI->>Server: Save reviewed products; publish shop
+    UI->>Server: Save reviewed products and publish shop
     Server->>DB: Save published catalog snapshot
 
     Buyer->>UI: Browse published products and add to basket
@@ -100,7 +100,7 @@ sequenceDiagram
     Seller->>Server: Stop new orders and resolve pending payments
     Server->>DB: Build immutable sales report
     Server-->>Seller: Download sales CSV
-    Seller->>Server: Upload fresh Original Store JSON v1; compare return
+    Seller->>Server: Upload fresh Original Store JSON v1 and compare return
     Server->>DB: Apply supported changes with duplicate-safe journal
     Server-->>Seller: Download updated original-store file
     Seller->>Server: Compare the same return again
