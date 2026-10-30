@@ -1,0 +1,30 @@
+# Free evaluation service: SQLite is ephemeral. See DEPLOY_RENDER.md.
+services:
+  - type: web
+    name: restorecart
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: RESTORECART_BASE_URL
+        sync: false
+      - key: RESTORECART_SELLER_EMAIL
+        sync: false
+      - key: RESTORECART_SELLER_PASSWORD
+        sync: false
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash-lite
