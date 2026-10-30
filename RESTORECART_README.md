@@ -158,3 +158,12 @@ Under **Orders**, expand **Example order statuses — simulated, no payments** t
 A buyer opens **Your orders → View order**, or keeps the receipt URL after checkout, to follow **Payment checking → Preparing → Ready for pickup → Collected**. Seller **Mark ready for pickup** and **Mark collected** update the actual record. The account refreshes every 15 seconds; an active receipt refreshes every 6 seconds until collection, cancellation or refund. These reads do not generate AI requests or initiate payment captures. Pickup only: no shipping or courier tracking is claimed.
 
 Verification: 78 RestoreCart tests and production build pass, including preloaded draft readiness, repeat preparation preserving seller work, publication preservation and payment-aware buyer status mapping. The prepared draft and separate simulated statuses were inspected in the local browser. No new live PayPal transaction was made for this change.
+
+
+## Hosted demo setup and sponsor UI update
+
+The configured seller now gets a prepared Sunday Studio Demo when its workspace is empty. Registered sellers can use **Load prepared Sunday Studio Demo**; this is independent from the local public demo-account seeder. All source records, shop details and status examples were already present in the extracted repository; only hosted initialization was missing. No private local orders or account databases are copied into GitHub or a hosted demo.
+
+Orders now has **Cards**, **Order table** (AG Grid Community) and **Pickup schedule**. Paid, unrefunded orders awaiting collection can be assigned a 1–240 minute pickup appointment; conflicts at the same shop counter are rejected. Appointments are stored separately from immutable order item/price snapshots and shown to the buyer. They are not automatically transferred by the existing original-store adapter.
+
+The optional Bryntum Scheduler Pro trial view renders actual saved appointments. Render defaults to `VITE_ENABLE_BRYNTUM=false`; hosted use requires applicable evaluation/deployment rights and a rebuild with `VITE_ENABLE_BRYNTUM=true`. AG Grid Community does not require or consume the earlier AG Studio trial key. No AI calls or automatic payments are made by either view. See DEPLOY_RENDER.md and docs/restorecart/HOSTED_DEMO_AND_ORDERS.md.

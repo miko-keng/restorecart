@@ -92,6 +92,8 @@ sequenceDiagram
         Note over Server,PP: Worker and verified webhooks reconcile the outcome
     end
     Server-->>UI: Return recorded payment and pickup status
+    Seller->>Server: Save pickup appointment if needed
+    Server->>DB: Validate paid order and reject conflicting windows
     Seller->>Server: Mark paid order ready, then collected
     Server->>DB: Save pickup status
     UI->>Server: Buyer tracking polls for updates
@@ -123,7 +125,7 @@ These two accounts have been registered in the local RestoreCart database. Sign 
 | Seller | `demo-seller` | `seller.demo@restorecart.test` | `RestoreSeller2026!` | `/restorecart/seller/sign-in` |
 | Buyer | `demo-buyer` | `buyer.demo@restorecart.test` | `RestoreBuyer2026!` | `/restorecart/account` |
 
-They are public synthetic **RestoreCart app** credentials, not your PayPal sandbox credentials. Use them for local demonstration only. The seller has its own “Sunday Studio Demo” workspace with the example source records; it does not take ownership of earlier shops or orders. No public demo accounts are automatically created by the server.
+They are public synthetic **RestoreCart app** credentials, not your PayPal sandbox credentials. Use them for local demonstration only. The seller has its own “Sunday Studio Demo” workspace with the example source records; it does not take ownership of earlier shops or orders. No public demo accounts are automatically created by the server. The configured seller receives a prepared Sunday Studio Demo draft when their workspace is empty; registered sellers can use **Load prepared Sunday Studio Demo** to create their own isolated copy.
 
 ```sh
 npm run restorecart:demo-accounts
@@ -138,7 +140,7 @@ Buyers sign in once across every shop; no separate shop login is required. Saved
 
 ## Seller interface
 
-The seller workspace now has **Shop editor**, **Orders**, and **Recovery**. Upload/import and product confirmation share one editor; Gemini assists import, source review and payment explanations. Shop details remain manual. Own draft/published previews replace the buyer-side navigation link. Shop backup download/restore lives in the editor menu, and sales report download lives in Recovery. Gemini is persistently enabled in `restorecart.config.json`; routine tests remain fixtures and existing usage limits still apply.
+The seller workspace has **Shop editor**, **Orders**, and **Recovery**. **Load prepared Sunday Studio Demo** works after hosted sign-in without public demo passwords, uploading files or re-entering shop details. Review remains unfinished for your demonstration. Upload/import and product confirmation share one editor; Gemini assists import, source review and payment explanations. Shop details remain manual. Own draft/published previews replace the buyer-side navigation link. Shop backup download/restore lives in the editor menu, and sales report download lives in Recovery. Gemini is persistently enabled in `restorecart.config.json`; routine tests remain fixtures and existing usage limits still apply.
 
 ## Recovery features in plain language
 
@@ -147,7 +149,7 @@ The seller workspace now has **Shop editor**, **Orders**, and **Recovery**. Uplo
 - **Update original-store records** is the optional actionable return inside that workspace. Upload a fresh **Original Store JSON v1** export, compare changes, resolve conflicts, apply to the local destination and download its updated file. Repeat comparison should show zero changes. This does not automatically write into Shopify/WooCommerce or charge the buyer again.
 - **Shop backup** is a versioned catalog/source/image/shop-details snapshot for reopening later. An operational restore creates an unpublished draft requiring fresh counts and confirmations. A rehearsal is isolated and cannot publish or take payments. Its return simulation proves repeat safety without placing an order. Kits intentionally exclude orders, sessions, passwords and payment records.
 
-RestoreCart Orders currently uses custom React cards. AG Studio and Bryntum are not used in this standalone repository.
+RestoreCart Orders offers custom React cards and an AG Grid Community table with sorting, column filters, quick search and order actions. A pickup appointment list is always available; the Bryntum Scheduler Pro evaluation timeline is optional and enabled locally for evaluation. Set `VITE_ENABLE_BRYNTUM=true` at build time only when your terms cover the hosted demo. AG Studio is a different product and is not used here; its licence is not required for AG Grid Community.
 
 Account passwords are stored with salted scrypt hashes; sessions use HTTP-only cookies and CSRF checks. Registered sellers can access only their own shops, sources, kits, orders and destinations. The configured workspace-owner login retains earlier unassigned shops. This prototype does not yet offer email verification, password recovery, independent merchant onboarding/payouts or production account administration.
 
@@ -167,3 +169,19 @@ npm run dev
 Open http://127.0.0.1:4370/restorecart. For checks, run `npm test` and `npm run build`. `npm start` always launches RestoreCart in production mode. It requires an HTTPS `RESTORECART_BASE_URL` and a private seller password.
 
 See [Render deployment instructions](DEPLOY_RENDER.md) to deploy this repository. No private .env, account database, local merchant orders or API secrets are included. The demo preparation command creates synthetic accounts and a reviewable draft locally; it refuses production. Hosted accounts must be registered privately. Source separation preserves earlier development in the original [ScrapDrop repository](https://github.com/miko-keng/scrapdrop), extracted from commit 7ee04e3.
+
+
+## Hosted demo and order workspace
+
+After deploying the latest `main`, sign in with the hosted seller credentials configured in Render. An empty configured workspace receives **Sunday Studio Demo** automatically. Other registered sellers can click **Load prepared Sunday Studio Demo**. This authenticated, CSRF-protected setup preserves existing shop reviews, publication and sales. It creates sample records and shop details, not fabricated paid orders or public credentials.
+
+Under **Orders**, expand **Example order statuses — simulated, no payments** for the prebuilt status illustrations. These cards are presentation-only and excluded from order queries, inventory, payment totals and recovery. They are not historical PayPal payments.
+
+For actual orders:
+
+- **Cards:** existing payment, pickup and refund actions.
+- **Order table:** AG Grid Community sorting, column filters, item/status search and **Open order** actions. No licence key required.
+- **Pickup schedule:** paid orders can have a seller-saved pickup start/end time. The server rejects overlapping bookings at that shop's counter, unpaid/refunded/collected orders and invalid durations. Buyers see appointments in their order history and receipt. A plain list is always available.
+- **Optional Bryntum evaluation timeline:** `VITE_ENABLE_BRYNTUM=true` enables the lazy-loaded Scheduler Pro timeline at build time. Render defaults to false; enable only under applicable evaluation/deployment rights. This is a display of saved appointments, not an invented fulfillment estimate. Vendor trial code is installed from the official public npm alias; installation lifecycle scripts stay disabled through `.npmrc`.
+
+See [migration audit and verification](docs/restorecart/HOSTED_DEMO_AND_ORDERS.md) for the extraction check and limitations.

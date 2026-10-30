@@ -1,3 +1,5 @@
+import { prepareDemoShop } from "./demo";
+import { pickupWindow, savePickupWindow } from "./pickups";
 import {
   accountTables,
   seedConfiguredAccount,
@@ -184,6 +186,7 @@ export function createApp(
       incident: o.incident,
       state: o.state,
       fulfillment: o.fulfillment,
+      pickupWindow: pickupWindow(db, o.id),
       amount: o.amount,
       refunded: o.refunded,
       provider: o.provider,
@@ -236,6 +239,22 @@ export function createApp(
     res.clearCookie("rc_session", { path: "/" });
     res.json({ ok: true });
   });
+  router.post(
+    "/demo/prepare",
+    seller,
+    asyncRoute(async (_req, res) => {
+      const shop = await prepareDemoShop(db, res.locals.user.id);
+      res.json(viewIncident(db, shop.id));
+    }),
+  );
+  router.post(
+    "/orders/:id/pickup-window",
+    seller,
+    asyncRoute((req, res) => {
+      savePickupWindow(db, parseId(req), req.body);
+      res.json(publicOrder(order(db, parseId(req))));
+    }),
+  );
   router.get("/incidents", seller, (_req, res) =>
     res.json(
       (

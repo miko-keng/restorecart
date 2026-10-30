@@ -8,6 +8,8 @@ services:
     startCommand: npm start
     healthCheckPath: /healthz
     envVars:
+      - key: VITE_ENABLE_BRYNTUM
+        value: "false"
       - key: NODE_ENV
         value: production
       - key: RESTORECART_BASE_URL

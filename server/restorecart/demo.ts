@@ -1,9 +1,29 @@
 import { createIncident, incident, save, type DB } from "./store";
-import { assignOwner } from "./accounts";
+import { assignOwner, BOOTSTRAP } from "./accounts";
 import { addSample, deterministicCandidates, sourceList } from "./sources";
 
 /** Prepare only the named demo draft; never reset a shop with sales or a publication. */
+const preparing = new WeakMap<
+  DB,
+  Map<string, Promise<ReturnType<typeof createIncident>>>
+>();
 export async function prepareDemoShop(db: DB, owner: string) {
+  let owners = preparing.get(db);
+  if (!owners) {
+    owners = new Map();
+    preparing.set(db, owners);
+  }
+  const pending = owners.get(owner);
+  if (pending) return pending;
+  const task = prepareDemoShopOnce(db, owner);
+  owners.set(owner, task);
+  try {
+    return await task;
+  } finally {
+    owners.delete(owner);
+  }
+}
+async function prepareDemoShopOnce(db: DB, owner: string) {
   const found = db
     .prepare(
       "SELECT i.id FROM rc_incidents i JOIN rc_owners o ON o.id=i.id AND o.kind='incident' WHERE o.account_id=? AND json_extract(i.body,'$.name')='Sunday Studio Demo' ORDER BY i.rowid LIMIT 1",
@@ -42,4 +62,14 @@ export async function prepareDemoShop(db: DB, owner: string) {
       JSON.stringify(value),
     );
   return shop;
+}
+
+/** Only bootstrap an empty configured workspace; never reset an existing seller shop. */
+export async function prepareEmptyConfiguredWorkspace(db: DB) {
+  const existing = db
+    .prepare(
+      "SELECT i.id FROM rc_incidents i LEFT JOIN rc_owners o ON o.id=i.id AND o.kind='incident' WHERE o.account_id=? OR o.id IS NULL LIMIT 1",
+    )
+    .get(BOOTSTRAP);
+  if (!existing) return prepareDemoShop(db, BOOTSTRAP);
 }

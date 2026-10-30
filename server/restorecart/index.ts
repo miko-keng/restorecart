@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
 import express from "express";
 import { createApp } from "./app";
+import { prepareEmptyConfiguredWorkspace } from "./demo";
 
 const production = process.env.NODE_ENV === "production",
   port = Number(
@@ -21,8 +22,11 @@ if (
     "Hosted RestoreCart requires RESTORECART_BASE_URL (HTTPS) and RESTORECART_SELLER_PASSWORD.",
   );
 const runtime = createApp({ base });
+await prepareEmptyConfiguredWorkspace(runtime.db);
 const { app } = runtime;
-app.get("/healthz", (_req, res) => res.json({status:"ok", application:"restorecart"}));
+app.get("/healthz", (_req, res) =>
+  res.json({ status: "ok", application: "restorecart" }),
+);
 app.get("/", (_req, res) => res.redirect("/restorecart"));
 const brandHTML = (html: string) =>
   html

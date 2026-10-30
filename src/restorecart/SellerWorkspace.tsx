@@ -1,3 +1,7 @@
+import { OrderViewBoundary } from "./OrderViewBoundary";
+import { lazy, Suspense } from "react";
+const OrderTable = lazy(() => import("./OrderTable"));
+const PickupSchedule = lazy(() => import("./PickupSchedule"));
 import { OrderProgress } from "./OrderProgress";
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
@@ -30,6 +34,8 @@ const money = (n: number) =>
   );
 export function SellerWorkspace(p: Props) {
   const [section, setSection] = useState("Shop editor"),
+    [orderView, setOrderView] = useState("Cards"),
+    [selectedOrder, setSelectedOrder] = useState(""),
     [readiness, setReadiness] = useState<any>(null),
     [mappings, setMappings] = useState<any[]>([]),
     [review, setReview] = useState<any>(null),
@@ -57,6 +63,7 @@ export function SellerWorkspace(p: Props) {
     setMessage("");
     setReadiness(null);
     setOrders([]);
+    setSelectedOrder("");
     setFilter("All");
     setContact(null);
   }, [shop?.id]);
@@ -287,6 +294,20 @@ export function SellerWorkspace(p: Props) {
           </button>
         </form>
       </div>
+      <button
+        className="rc-link"
+        disabled={!!p.busy}
+        onClick={() =>
+          p.run("Preparing demo shop", async () => {
+            const demo = await p.api("/demo/prepare", {});
+            await p.loadList();
+            await p.load(demo.id);
+            setSection("Shop editor");
+          })
+        }
+      >
+        Load prepared Sunday Studio Demo
+      </button>
       {!shop ? (
         <section className="rc-panel">
           <h2>Create your shop to get started.</h2>
@@ -800,6 +821,35 @@ export function SellerWorkspace(p: Props) {
                   </button>
                 ))}
               </div>
+              <div className="rc-order-filters" aria-label="Order display">
+                {["Cards", "Order table", "Pickup schedule"].map((v) => (
+                  <button
+                    key={v}
+                    aria-pressed={orderView === v}
+                    onClick={() => {
+                      setOrderView(v);
+                      setSelectedOrder("");
+                    }}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+              <OrderViewBoundary key={orderView}>
+                {orderView === "Order table" && (
+                  <Suspense fallback={<p>Loading order table…</p>}>
+                    <OrderTable
+                      orders={orders.filter(matches)}
+                      onSelect={setSelectedOrder}
+                    />
+                  </Suspense>
+                )}
+                {orderView === "Pickup schedule" && (
+                  <Suspense fallback={<p>Loading pickup schedule…</p>}>
+                    <PickupSchedule orders={orders.filter(matches)} />
+                  </Suspense>
+                )}
+              </OrderViewBoundary>
               {!orders.filter(matches).length ? (
                 <p>
                   {orders.length
@@ -809,6 +859,9 @@ export function SellerWorkspace(p: Props) {
               ) : (
                 orders
                   .filter(matches)
+                  .filter(
+                    (o) => orderView === "Cards" || selectedOrder === o.id,
+                  )
                   .map((o) => (
                     <SellerOrder
                       key={o.id}
@@ -1329,6 +1382,56 @@ function SellerOrder({ order: o, shop, p, refreshed }: any) {
           .map((l: any) => `${l.quantity} × ${l.name}`)
           .join(" · ")}
       </p>
+      {o.pickupWindow && (
+        <p>
+          Pickup appointment: {new Date(o.pickupWindow.start).toLocaleString()}{" "}
+          – {new Date(o.pickupWindow.end).toLocaleTimeString()}
+        </p>
+      )}
+      {o.state === "paid" &&
+        !o.refunded &&
+        !blocked &&
+        o.fulfillment !== "collected" && (
+          <details>
+            <summary>Schedule pickup time</summary>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const f = new FormData(e.currentTarget);
+                void p.run("Saving pickup appointment", async () => {
+                  const start = new Date(String(f.get("pickupStart"))),
+                    end = new Date(String(f.get("pickupEnd")));
+                  if (
+                    !Number.isFinite(start.getTime()) ||
+                    !Number.isFinite(end.getTime())
+                  )
+                    throw Error("Enter valid pickup dates and times.");
+                  await p.api(`/orders/${o.id}/pickup-window`, {
+                    start: start.toISOString(),
+                    end: end.toISOString(),
+                  });
+                  await refreshed();
+                });
+              }}
+            >
+              <label>
+                Pickup starts
+                <input name="pickupStart" type="datetime-local" required />
+              </label>
+              <label>
+                Pickup ends
+                <input name="pickupEnd" type="datetime-local" required />
+              </label>
+              <button className="rc-button secondary" disabled={!!p.busy}>
+                Save pickup appointment
+              </button>
+            </form>
+            <p>
+              One pickup counter. Overlapping appointments are rejected. Save a
+              time, then open Pickup schedule to see it.
+            </p>
+          </details>
+        )}
       {o.refunded > 0 && (
         <p>Refunded {money(o.refunded)}. Stock is restored separately.</p>
       )}

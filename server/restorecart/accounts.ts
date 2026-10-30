@@ -1,3 +1,4 @@
+import { pickupWindow } from "./pickups";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { hash, uid, fail } from "./domain";
@@ -411,6 +412,7 @@ export function mountAccounts(
         rows.map(({ token, body, ...o }) => ({
           ...o,
           shopName: incident(db, o.incident).name,
+          pickupWindow: pickupWindow(db, o.id),
           receiptUrl: `/restorecart/receipt/${o.id}?access=${token}`,
         })),
       );

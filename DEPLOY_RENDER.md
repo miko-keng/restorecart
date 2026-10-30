@@ -31,4 +31,11 @@ For durable demonstrations, use a Render service with a persistent disk mounted 
 
 Register/update the PayPal sandbox webhook URL to `https://YOUR-NEW-SERVICE/api/paypal/webhook` and put that registration's ID in `PAYPAL_WEBHOOK_ID`. The existing event list is documented in RESTORECART_README.md. Changing hosts does not transfer a webhook registration automatically.
 
-The configured hosted seller signs in using `RESTORECART_SELLER_EMAIL` and the private password you set. Register a private buyer through the buyer sign-in page. The public local demo seeder intentionally refuses production. No local database or account records are uploaded to GitHub or transferred to Render by deployment.
+The configured hosted seller signs in using `RESTORECART_SELLER_EMAIL` and the private password you set. Register a private buyer through the buyer sign-in page. The public local demo-account seeder intentionally refuses production; it is no longer required to prepare the hosted demo shop. No local database or account records are uploaded to GitHub or transferred to Render by deployment.
+
+
+## Prepared shop on the hosted service
+
+On startup, an empty configured seller workspace receives **Sunday Studio Demo** with source files, products awaiting review and saved shop details. If you registered a different seller, click **Load prepared Sunday Studio Demo** after sign-in. The loader creates a copy owned by that account and preserves existing work on repeat use. It does not create public demo credentials or fake payments. Order-status examples appear under Orders in a labelled examples section.
+
+AG Grid Community is available in **Orders → Order table** without a key. The pickup appointment list also works without additional configuration. The optional Bryntum trial timeline is off on Render by default. If your evaluation rights cover the hosted demo, set `VITE_ENABLE_BRYNTUM=true` in Render and choose **Save, rebuild, and deploy**. This is a build-time variable. An AG Studio licence is not an AG Grid Enterprise licence and is not used by this integration.

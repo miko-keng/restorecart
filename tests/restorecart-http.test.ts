@@ -1920,3 +1920,152 @@ test("RestoreCart AI review and payment help are private explanations and never 
     await f.close();
   }
 });
+
+test("Hosted demo loader is seller-owned, idempotent, CSRF-protected and contains no fake sales", async () => {
+  const f = await fixture();
+  try {
+    assert.equal((await f.buyer.request("/demo/prepare", {})).status, 403);
+    assert.equal(
+      (await f.seller.request("/demo/prepare", {}, undefined, false)).status,
+      403,
+    );
+    const first = await f.seller.request("/demo/prepare", {});
+    assert.equal(first.status, 200);
+    assert.equal(first.data.name, "Sunday Studio Demo");
+    assert.equal(first.data.sources.length, 2);
+    assert.ok(first.data.pickup);
+    const second = await f.seller.request("/demo/prepare", {});
+    assert.equal(second.data.id, first.data.id);
+    assert.equal(
+      (await f.seller.request(`/orders?incident=${first.data.id}`)).data.length,
+      0,
+    );
+    await f.stranger.request("/register", {
+      email: "another.seller@example.test",
+      username: "another-seller",
+      password: "AnotherSeller123!",
+      role: "seller",
+    });
+    assert.equal(
+      (await f.stranger.request(`/incidents/${first.data.id}`)).status,
+      403,
+    );
+    const other = await f.stranger.request("/demo/prepare", {});
+    assert.equal(other.status, 200);
+    assert.notEqual(other.data.id, first.data.id);
+    assert.equal(
+      (await f.buyer.request(`/sources/${first.data.sources[0].id}`)).status,
+      403,
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+test("Pickup appointments remain private, reject overlaps and unpaid orders, and reach buyer tracking", async () => {
+  const f = await fixture();
+  try {
+    const shop = await prepare(f);
+    await f.buyer.request("/register", {
+      email: "tracking-buyer@example.test",
+      username: "tracking-buyer",
+      password: "TrackingBuyer123!",
+      role: "buyer",
+    });
+    const make = async (key: string) => {
+      const r = await f.buyer.request(`/shops/${shop.slug}/orders`, {
+        revision: shop.published.revision,
+        requestKey: key,
+        lines: [{ sku: "MUG-BLU", quantity: 1 }],
+      });
+      assert.equal(r.status, 200);
+      return r.data;
+    };
+    const a = await make("appointment-a"),
+      b = await make("appointment-b");
+    const window = {
+      start: "2026-11-01T10:00:00+08:00",
+      end: "2026-11-01T10:30:00+08:00",
+    };
+    assert.equal(
+      (await f.seller.request(`/orders/${a.id}/pickup-window`, window)).status,
+      409,
+    );
+    for (const o of [a, b]) {
+      f.pp.get(o.provider).status = "APPROVED";
+      assert.equal(
+        (await f.buyer.request(`/orders/${o.id}/check`, {})).data.state,
+        "paid",
+      );
+    }
+    assert.equal(
+      (await f.buyer.request(`/orders/${a.id}/pickup-window`, window)).status,
+      403,
+    );
+    const saved = await f.seller.request(
+      `/orders/${a.id}/pickup-window`,
+      window,
+    );
+    assert.equal(saved.status, 200);
+    assert.deepEqual(saved.data.pickupWindow, window);
+    assert.deepEqual(
+      (await f.buyer.request(`/orders/${a.id}`)).data.pickupWindow,
+      window,
+    );
+    assert.deepEqual(
+      (await f.buyer.request("/my-orders")).data.find((o: any) => o.id === a.id)
+        .pickupWindow,
+      window,
+    );
+    assert.equal((await f.stranger.request(`/orders/${a.id}`)).status, 403);
+    assert.equal(
+      (await f.seller.request(`/orders/${b.id}/pickup-window`, window)).status,
+      409,
+    );
+    assert.equal(
+      (
+        await f.seller.request(`/orders/${a.id}/pickup-window`, {
+          ...window,
+          end: window.start,
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await f.seller.request(`/orders/${a.id}/pickup-window`, {
+          ...window,
+          end: "2026-11-01T18:30:00+08:00",
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await f.seller.request(`/orders/${b.id}/pickup-window`, {
+          start: window.end,
+          end: "2026-11-01T11:00:00+08:00",
+        })
+      ).status,
+      200,
+    );
+    await f.seller.request(`/orders/${a.id}/fulfillment`, { state: "ready" });
+    await f.seller.request(`/orders/${a.id}/fulfillment`, {
+      state: "collected",
+    });
+    assert.equal(
+      (await f.seller.request(`/orders/${a.id}/pickup-window`, window)).status,
+      409,
+    );
+    assert.equal(
+      (await f.seller.request(`/orders/${b.id}/refund`, {})).status,
+      200,
+    );
+    assert.equal(
+      (await f.seller.request(`/orders/${b.id}/pickup-window`, window)).status,
+      409,
+    );
+  } finally {
+    await f.close();
+  }
+});

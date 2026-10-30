@@ -2,7 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { openRC, save, incident } from "../server/restorecart/store";
 import { accountTables } from "../server/restorecart/accounts";
-import { prepareDemoShop } from "../server/restorecart/demo";
+import {
+  prepareDemoShop,
+  prepareEmptyConfiguredWorkspace,
+} from "../server/restorecart/demo";
 import { readiness } from "../server/restorecart/continuity";
 import { orderProgress } from "../src/restorecart/orderStatus";
 
@@ -95,4 +98,44 @@ test("Buyer tracking never mistakes approval or refund for ready paid pickup", (
       .step,
     -1,
   );
+});
+
+test("Hosted bootstrap prepares an empty configured owner once and preserves seller review", async () => {
+  const db = openRC(":memory:");
+  accountTables(db);
+  try {
+    await prepareEmptyConfiguredWorkspace(db);
+    const row = db
+      .prepare("SELECT id FROM rc_owners WHERE account_id='configured-seller'")
+      .get() as any;
+    assert.ok(row);
+    assert.equal(incident(db, row.id).name, "Sunday Studio Demo");
+    assert.equal(readiness(db, row.id).needsInformation, 3);
+    const before = incident(db, row.id);
+    before.products[0].resolutionNote = "Do not reset";
+    save(db, before);
+    await prepareEmptyConfiguredWorkspace(db);
+    assert.equal(
+      incident(db, row.id).products[0].resolutionNote,
+      "Do not reset",
+    );
+    assert.equal(db.prepare("SELECT COUNT(*) n FROM rc_incidents").get()?.n, 1);
+    assert.equal(db.prepare("SELECT COUNT(*) n FROM rc_orders").get()?.n, 0);
+  } finally {
+    db.close();
+  }
+});
+test("Concurrent demo setup creates one owned draft", async () => {
+  const db = openRC(":memory:");
+  accountTables(db);
+  try {
+    const [a, b] = await Promise.all([
+      prepareDemoShop(db, "same-owner"),
+      prepareDemoShop(db, "same-owner"),
+    ]);
+    assert.equal(a.id, b.id);
+    assert.equal(db.prepare("SELECT COUNT(*) n FROM rc_incidents").get()?.n, 1);
+  } finally {
+    db.close();
+  }
 });
