@@ -2,6 +2,118 @@
 
 RestoreCart reconstructs a catalog from surviving records, opens a temporary pickup storefront with PayPal sandbox checkout, and returns emergency sales through a duplicate-safe local recovery process. Detailed setup: [RESTORECART_README.md](RESTORECART_README.md).
 
+## Architecture
+
+RestoreCart is one application with separate seller and buyer views. React runs in the browser; an Express server handles authentication, Gemini requests, PayPal sandbox payments and SQLite storage. API keys stay on the server.
+
+```mermaid
+flowchart TB
+    subgraph Browser["Browser — React"]
+        Seller["Seller workspace<br/>Import · Review · Publish · Orders · Recovery"]
+        Buyer["Buyer storefront<br/>Search · Basket · Checkout · Order tracking"]
+    end
+
+    subgraph Service["RestoreCart Node.js service — Render"]
+        API["Express API<br/>Sessions · CSRF · Seller ownership checks"]
+        Catalog["Catalog reconstruction<br/>Parse sources · Validate evidence · Ask focused questions"]
+        Checkout["Checkout and inventory<br/>Server prices · Stock reservations · Order snapshots"]
+        Payments["Payment reconciliation<br/>Verify amount, currency and merchant<br/>Commit each capture once"]
+        Worker["Background worker<br/>Retry pending payments and verified events"]
+        Recovery["Recovery and backups<br/>Sales report · Return journal · Versioned shop backup"]
+        DB[("SQLite<br/>Accounts · Sources · Catalogs · Stock<br/>Orders · Payment events · Recovery history")]
+    end
+
+    Gemini["Gemini API<br/>Catalog proposals · Review suggestions<br/>Payment explanations"]
+    PayPal["PayPal Sandbox<br/>Orders · Capture · Refund · Webhook verification"]
+    Files["Downloaded files<br/>Shop backup JSON · Sales CSV<br/>Updated Original Store JSON v1"]
+
+    Seller --> API
+    Buyer --> API
+    API --> Catalog
+    API --> Checkout
+    API --> Payments
+    API --> Recovery
+    Catalog <-->|"Bounded AI requests; validated responses"| Gemini
+    API <-->|"Explicit review or explanation request"| Gemini
+    Catalog <--> DB
+    Checkout <--> DB
+    Payments <--> DB
+    Recovery <--> DB
+    API <--> DB
+    Checkout -->|"Create sandbox order"| PayPal
+    Buyer -->|"Approve on PayPal-hosted checkout"| PayPal
+    Payments <-->|"Read, capture or refund through server APIs"| PayPal
+    PayPal -->|"Webhook: /api/paypal/webhook"| Payments
+    Payments -->|"Verify signature before queuing event"| Worker
+    Worker --> Payments
+    Recovery --> Files
+```
+
+### End-to-end flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Seller
+    participant UI as RestoreCart browser
+    participant Server as Express server
+    participant AI as Gemini
+    participant DB as SQLite
+    actor Buyer
+    participant PP as PayPal Sandbox
+
+    Seller->>UI: Upload CSV, PDF or product images
+    UI->>Server: Save source records
+    Server->>DB: Store original evidence
+    Seller->>UI: Import or review with Gemini
+    UI->>Server: Request AI assistance
+    Server->>AI: Sources and constrained instructions
+    AI-->>Server: Product proposals, evidence and questions
+    Server->>Server: Validate source references and supported values
+    Server->>DB: Save draft or cache validated suggestions
+    Server-->>UI: Show conflicts and missing information
+    Seller->>UI: Confirm price, physical count, allocation and pickup details
+    UI->>Server: Save reviewed products; publish shop
+    Server->>DB: Save published catalog snapshot
+
+    Buyer->>UI: Browse published products and add to basket
+    UI->>Server: Checkout selected shop
+    Server->>DB: Validate catalog, price order and reserve stock
+    Server->>PP: Create sandbox order
+    PP-->>UI: PayPal approval link
+    Buyer->>PP: Approve sandbox checkout
+    PP-->>UI: Return to receipt
+    UI->>Server: Check order outcome
+    Server->>PP: Verify order and request capture when approved
+    alt Verified completed capture
+        Server->>DB: Mark paid and commit stock movement once
+    else Pending or uncertain payment
+        Server->>DB: Keep payment checking and stock locked
+        Note over Server,PP: Worker and verified webhooks reconcile the outcome
+    end
+    Server-->>UI: Return recorded payment and pickup status
+    Seller->>Server: Mark paid order ready, then collected
+    Server->>DB: Save pickup status
+    UI->>Server: Buyer tracking polls for updates
+    Server-->>UI: Preparing, ready for pickup or collected
+
+    Seller->>Server: Stop new orders and resolve pending payments
+    Server->>DB: Build immutable sales report
+    Server-->>Seller: Download sales CSV
+    Seller->>Server: Upload fresh Original Store JSON v1; compare return
+    Server->>DB: Apply supported changes with duplicate-safe journal
+    Server-->>Seller: Download updated original-store file
+    Seller->>Server: Compare the same return again
+    Server-->>Seller: No duplicate changes
+```
+
+The buyer approves payment on PayPal; RestoreCart verifies the outcome before marking an order paid. Gemini proposes and explains; it cannot confirm physical stock, publish products, mark payments paid or issue refunds. Seller actions and server validation control those transitions.
+
+- **Shop backup:** saves catalog, evidence, images and shop details for a new unpublished draft or an isolated rehearsal. It excludes accounts, orders and payments; fresh stock confirmation is required after restoration.
+- **Sales recovery:** returns recorded emergency sales, refunds and stock changes through the supported **local Original Store JSON v1 adapter**. It does not automatically update Shopify or WooCommerce, and applying a return does not charge a buyer again.
+- **Demo boundary:** prepared records and simulated order-status cards are labelled examples. Simulated cards never enter payment, inventory or recovery records. Actual checkout uses PayPal sandbox. One configured sandbox merchant receives payments; independent seller payout onboarding is not implemented.
+- **Hosting boundary:** SQLite requires persistent storage to retain accounts, uploads and orders across redeploys. The free Render configuration is ephemeral; see [deployment instructions](DEPLOY_RENDER.md).
+
 ## RestoreCart demo accounts (local practice)
 
 These two accounts have been registered in the local RestoreCart database. Sign in with either the username or email.
