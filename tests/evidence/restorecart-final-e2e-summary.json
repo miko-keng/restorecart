@@ -1,0 +1,81 @@
+{
+  "date": "2026-10-30",
+  "timezone": "Asia/Kuala_Lumpur",
+  "scope": "Isolated local standalone RestoreCart; Render not directly verified",
+  "automated": {
+    "tests": 84,
+    "passed": 84,
+    "failed": 0,
+    "skipped": 0,
+    "build": "passed"
+  },
+  "live_gemini": {
+    "review_action": "passed",
+    "price_conflict": [
+      "18.00",
+      "20.00"
+    ],
+    "human_confirmation_required": true
+  },
+  "live_paypal_sandbox": {
+    "checkout": "passed",
+    "captured_cents": 5200,
+    "currency": "USD",
+    "lines": [
+      {
+        "sku": "MUG-BLU",
+        "quantity": 2,
+        "unit_cents": 2000
+      },
+      {
+        "sku": "TOTE-NAT",
+        "quantity": 1,
+        "unit_cents": 1200
+      }
+    ],
+    "fulfillment": "collected",
+    "refunded_cents": 0,
+    "collected_refund_attempt": "blocked before provider call",
+    "webhook_delivery": "not verified from loopback"
+  },
+  "buyer_tracking": {
+    "preparing": true,
+    "ready_auto_update": true,
+    "collected_auto_update": true,
+    "saved_appointment_visible": true,
+    "basket_survives_login": true
+  },
+  "recovery": {
+    "first_changes": 3,
+    "repeat_changes": 0,
+    "already_recorded": 1,
+    "return_inventory": {
+      "MUG-BLU": 6,
+      "MUG-RED": 5,
+      "TOTE-NAT": 3
+    },
+    "report_csv_checked": true,
+    "returned_json_checked": true
+  },
+  "backup": {
+    "version": 1,
+    "products": 3,
+    "sources": 2,
+    "orders_copied": 0,
+    "fresh_counts_required": true,
+    "rehearsal_first_changes": 2,
+    "rehearsal_repeat_changes": 0
+  },
+  "fixes": [
+    "Remember restored/rehearsal shop on refresh and expose all owned shops in selector",
+    "Hide refund control for collected, unverified or checking-refund orders"
+  ],
+  "remaining_limits": [
+    "No direct hosted Render check",
+    "No hosted webhook delivery check",
+    "Refund success and pending/cancel/failure/concurrency edge cases use injected-transport integration tests",
+    "Original-store return is local JSON v1, not a Shopify/WooCommerce API write",
+    "Bryntum hosted evaluation remains opt-in",
+    "Free Render storage is ephemeral"
+  ]
+}

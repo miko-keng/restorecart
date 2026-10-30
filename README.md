@@ -116,6 +116,10 @@ The buyer approves payment on PayPal; RestoreCart verifies the outcome before ma
 - **Demo boundary:** prepared records and simulated order-status cards are labelled examples. Simulated cards never enter payment, inventory or recovery records. Actual checkout uses PayPal sandbox. One configured sandbox merchant receives payments; independent seller payout onboarding is not implemented.
 - **Hosting boundary:** SQLite requires persistent storage to retain accounts, uploads and orders across redeploys. The free Render configuration is ephemeral; see [deployment instructions](DEPLOY_RENDER.md).
 
+## Demo verification and rehearsal
+
+The final local seller/buyer E2E run used live Gemini review and one real PayPal sandbox capture ($52 test funds), then verified pickup tracking, backup restoration and zero-duplicate recovery. After fixing two UI issues, all 84 automated tests and the production build pass. [Read the scoped test report](docs/restorecart/FINAL_E2E_REPORT.md) and [follow the exact input/button guide](DEMO_REHEARSAL_GUIDE.md). This does not establish that the current Render deployment or hosted webhook delivery has been verified.
+
 ## RestoreCart demo accounts (local practice)
 
 These two accounts have been registered in the local RestoreCart database. Sign in with either the username or email.

@@ -194,6 +194,11 @@ test("RestoreCart HTTP complete reconstruct / publish / paid order / pickup / re
       ).data.fulfillment,
       "collected",
     );
+    assert.equal(
+      (await f.seller.request(`/orders/${oid}/refund`, {})).status,
+      409,
+    );
+    assert.equal(f.db.prepare("SELECT COUNT(*) n FROM rc_refunds").get()?.n, 0);
     await f.seller.request(`/incidents/${f.id}/close`, {});
     const exported = await f.seller.request(`/incidents/${f.id}/exports`, {});
     assert.equal(exported.status, 200);

@@ -1,3 +1,4 @@
+import { preferredShop } from "./selection";
 import { OrderProgress } from "./OrderProgress";
 import { SellerWorkspace } from "./SellerWorkspace";
 import { Basket } from "./Basket";
@@ -248,7 +249,7 @@ export default function RestoreCartApp() {
     if (s.seller) {
       const all = await loadList();
       if (all.length)
-        await load(all.find((i: any) => i.demoPrepared)?.id || all[0].id);
+        await load(preferredShop(all, sessionStorage.getItem("rc-current"))!);
       go("/restorecart/seller");
     } else go("/restorecart/shops");
   }
@@ -302,11 +303,7 @@ export default function RestoreCartApp() {
       .then(async (all) => {
         if (!alive) return;
         const id = sessionStorage.getItem("rc-current");
-        if (all.length)
-          await load(
-            all.find((i: any) => i.demoPrepared)?.id ||
-              (all.some((i: any) => i.id === id) ? id! : all[0].id),
-          );
+        if (all.length) await load(preferredShop(all, id)!);
       })
       .catch((e) => {
         if (alive) setError(e.message);

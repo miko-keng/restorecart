@@ -1,3 +1,4 @@
+import { preferredShop } from "../src/restorecart/selection";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { openRC, save, incident } from "../server/restorecart/store";
@@ -7,7 +8,7 @@ import {
   prepareEmptyConfiguredWorkspace,
 } from "../server/restorecart/demo";
 import { readiness } from "../server/restorecart/continuity";
-import { orderProgress } from "../src/restorecart/orderStatus";
+import { orderProgress, canRefundOrder } from "../src/restorecart/orderStatus";
 
 test("Prepared demo has evidence and contact details but requires human review and creates no sales", async () => {
   const db = openRC(":memory:");
@@ -138,4 +139,37 @@ test("Concurrent demo setup creates one owned draft", async () => {
   } finally {
     db.close();
   }
+});
+
+test("Seller resumes a restored or rehearsal draft instead of being forced back to the original demo", () => {
+  const shops = [
+    { id: "restored" },
+    { id: "rehearsal" },
+    { id: "original", demoPrepared: true },
+  ];
+  assert.equal(preferredShop(shops, "restored"), "restored");
+  assert.equal(preferredShop(shops, "rehearsal"), "rehearsal");
+  assert.equal(preferredShop(shops, null), "original");
+  assert.equal(preferredShop(shops, "another-sellers-shop"), "original");
+  assert.equal(preferredShop([{ id: "ordinary" }], null), "ordinary");
+  assert.equal(preferredShop([], "restored"), null);
+});
+
+test("Refund controls match server eligibility instead of offering collected or unverified refunds", () => {
+  const paid = {
+    state: "paid",
+    fulfillment: "not_ready",
+    refunded: 0,
+    capture: "verified-test-capture",
+  };
+  assert.equal(canRefundOrder(paid), true);
+  assert.equal(canRefundOrder({ ...paid, fulfillment: "ready" }), true);
+  assert.equal(canRefundOrder({ ...paid, fulfillment: "collected" }), false);
+  assert.equal(canRefundOrder({ ...paid, capture: null }), false);
+  assert.equal(canRefundOrder({ ...paid, state: "pending" }), false);
+  assert.equal(canRefundOrder({ ...paid, refunded: 5200 }), false);
+  assert.equal(
+    canRefundOrder({ ...paid, refund: { state: "checking" } }),
+    false,
+  );
 });

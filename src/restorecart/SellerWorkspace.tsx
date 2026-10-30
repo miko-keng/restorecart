@@ -1,3 +1,4 @@
+import { canRefundOrder } from "./orderStatus";
 import { OrderViewBoundary } from "./OrderViewBoundary";
 import { lazy, Suspense } from "react";
 const OrderTable = lazy(() => import("./OrderTable"));
@@ -257,13 +258,11 @@ export function SellerWorkspace(p: Props) {
             <option value="" disabled>
               Select a shop
             </option>
-            {p.incidents
-              .filter((i) => !shop?.demoPrepared || i.id === shop.id)
-              .map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name} · {i.state}
-                </option>
-              ))}
+            {p.incidents.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.name} · {i.state}
+              </option>
+            ))}
           </select>
         </label>
         <form
@@ -1507,7 +1506,7 @@ function SellerOrder({ order: o, shop, p, refreshed }: any) {
           </small>
         </div>
       )}
-      {o.state === "paid" && !o.refunded && (
+      {canRefundOrder(o) && (
         <details>
           <summary>Refund options</summary>
           <label>
@@ -1532,6 +1531,12 @@ function SellerOrder({ order: o, shop, p, refreshed }: any) {
             Request full refund
           </button>
         </details>
+      )}
+      {o.state === "paid" && !o.refunded && o.fulfillment === "collected" && (
+        <p>
+          This order is collected. This prototype supports refunds for
+          uncollected orders only.
+        </p>
       )}
       {o.refunded > 0 && !o.refund?.restocked && !blocked && (
         <details>

@@ -50,3 +50,18 @@ export const orderSteps = [
   "Ready for pickup",
   "Collected",
 ];
+
+export function canRefundOrder(
+  o: TrackableOrder & {
+    capture?: string | null;
+    refund?: { state?: string } | null;
+  },
+) {
+  return (
+    o.state === "paid" &&
+    !!o.capture &&
+    !o.refunded &&
+    o.fulfillment !== "collected" &&
+    o.refund?.state !== "checking"
+  );
+}
