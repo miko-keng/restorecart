@@ -23,7 +23,7 @@ Pushing this repository to GitHub preserves source code and sample fixtures, **n
 - **Historical real sandbox E2E:** the documented local run used live Gemini and a $52 PayPal sandbox capture, followed by fulfillment, backup restoration and duplicate-safe local recovery. The historical 84-test count belongs to that earlier run. [Recorded E2E report](docs/restorecart/FINAL_E2E_REPORT.md).
 - **Local demonstration:** follow the [input/button rehearsal guide](DEMO_REHEARSAL_GUIDE.md) to show actual sandbox checkout, Orders, pickup tracking and recovery in one running session. Clearly identify Sample preview and saved Gemini replay. An edited demonstration should not imply simulated examples are actual payments.
 - **Submission video:** final public video link is pending. The recording should show the local flow and disclose that the free hosted demo may reset. No claim is made here that an unlinked video has already been reviewed.
-- **Hosted verification still pending:** latest deployment, hosted checkout/webhook checks and persistence across a Render restart. Documentation and local tests do not establish those results.
+- **Current hosted verification:** implementation commit `85c9474` was deployed on 31 October 2026 and completed a real $52 PayPal sandbox capture, seller fulfillment, buyer pickup tracking and local-file recovery with zero repeat changes. [Hosted release report](docs/restorecart/HOSTED_RELEASE_REPORT.md). Webhook delivery was not independently observed in that journey; it used the verified server payment flow. A configuration redeploy also demonstrated loss of temporary app records, so no persistence claim is made.
 
 WooCommerce is an optional seller-configured connector. Automated contract tests exist; real-store verification is pending. It is not required to run the supported local Original Store JSON v1 recovery demonstration. External Turso/libSQL storage can be configured later using the [setup and migration guide](docs/restorecart/EXTERNAL_STORAGE.md).
 
@@ -152,7 +152,7 @@ The buyer approves payment on PayPal; RestoreCart verifies the outcome before ma
 
 ## Demo verification and rehearsal
 
-The earlier documented local seller/buyer E2E run used live Gemini review and one real PayPal sandbox capture ($52 test funds), then verified pickup tracking, backup restoration and zero-duplicate recovery. At that milestone, 84 automated tests and the production build passed. The current automated suite contains 114 tests; see the reviewer guide above. [Read the scoped test report](docs/restorecart/FINAL_E2E_REPORT.md) and [follow the exact input/button guide](DEMO_REHEARSAL_GUIDE.md). This does not establish that the current Render deployment or hosted webhook delivery has been verified.
+The earlier documented local seller/buyer E2E run used live Gemini review and one real PayPal sandbox capture ($52 test funds), then verified pickup tracking, backup restoration and zero-duplicate recovery. At that milestone, 84 automated tests and the production build passed. The current automated suite contains 114 tests; see the reviewer guide above. [Read the scoped test report](docs/restorecart/FINAL_E2E_REPORT.md) and [follow the exact input/button guide](DEMO_REHEARSAL_GUIDE.md). For the newer hosted verification, see the [hosted release report](docs/restorecart/HOSTED_RELEASE_REPORT.md); independent hosted webhook delivery remains unverified.
 
 ## RestoreCart demo accounts (local practice)
 

@@ -18,13 +18,13 @@ Resettable sandbox prototype; no external database registration is required for 
 
 | Stage | Evidence/status |
 | --- | --- |
-| Final source push | Pending in this release task |
-| Latest Render deploy | Pending after push; prior live commit b426755 |
-| Public repository / license | LICENSE exists at root; public signed-out check pending |
-| Hosted seller/buyer journey | Pending on the new deployed commit |
-| Hosted actual sandbox capture / fulfillment / repeated local recovery | Pending on the new deployed commit |
+| Final source push | Implementation commit `85c9474` pushed to main |
+| Latest Render deploy | `85c9474` succeeded and Live; corrected-configuration deployment confirmed |
+| Public repository / license | GitHub marks repository Public; MIT license visible in About and root LICENSE |
+| Hosted seller/buyer journey | Test seller and buyer registered; isolated draft prepared; genuine saved Gemini conflict reviewed; three products confirmed, previewed and published; $52 buyer basket verified |
+| Hosted actual sandbox capture / fulfillment / repeated local recovery | Passed on `85c9474`: $52 captured; actual seller order; scheduled pickup; buyer Ready/Collected; first return 3 changes; repeat 0 changes / 1 already recorded |
 | Video | Recording script ready; final recording/upload/public URL pending |
-| Bryntum entitlement | Trial package 7.3.7 confirmed; individual trial start/expiry and hosted evaluation entitlement cannot be established from repository files. Appointment-list fallback retained. |
+| Bryntum entitlement | Trial package 7.3.7 confirmed; original BRYNTUM_SETUP.md located and documented; it contains no personal trial start/expiry or hosted evaluation entitlement. Appointment-list fallback retained. |
 | External storage | Optional, not configured or cloud-restart verified |
 
 ## Submission materials ready
@@ -45,3 +45,13 @@ Bryntum's installed package identifies itself as a trial; a generic 45-day durat
 - https://paypalaihackathon.devpost.com/rules
 
 The rules list judging as 1–15 December 2026. Do not infer trial coverage through that period from an October download without checking the actual entitlement. No expiry date is fabricated here.
+
+## Hosted payment diagnosis
+
+The deployed app created an order for $52 and correctly retained Payment checking after PayPal connection failed. Its unapproved checkout was canceled; no paid order or fulfillment was fabricated. A private comparison confirmed that the hosted client ID matches the known-working sandbox app, while the configured secret differs. The local pair authenticated against PayPal sandbox (HTTP 200). Credential values are not included in this report. The operator corrected the secret privately and redeployed; the retry then completed the actual $52 sandbox payment, fulfillment and duplicate-safe recovery. No fake payment was substituted. That configuration redeploy discarded temporary app records, so the test seller/buyer and prepared shop were recreated using the documented reset procedure.
+
+## Completion and remaining user work
+
+Engineering, local regression, source push, Render deployment and the advertised hosted rescue-to-return journey are complete. See [hosted report](HOSTED_RELEASE_REPORT.md). Final evidence/documentation is pushed with Render's documented `[skip render]` phrase because it changes no runtime code and an unnecessary redeploy would discard the demonstrated transaction records. The running implementation remains `85c9474`.
+
+The final video has not been recorded or uploaded; the user confirmed none exists. The exact script is prepared. Public YouTube-link validation and adding that URL to the submission remain pending. Bryntum's personal trial expiry/hosted entitlement is not established by the located setup file; retain the list fallback and do not claim it is verified.

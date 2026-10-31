@@ -37,7 +37,7 @@ The configured hosted seller signs in using `RESTORECART_SELLER_EMAIL` and the p
 
 On startup, an empty configured seller workspace receives **Sunday Studio Demo** with source files, products awaiting review and saved shop details. If you registered a different seller, click **Load prepared Sunday Studio Demo** after sign-in. The loader creates a copy owned by that account and preserves existing work on repeat use. It does not create public demo credentials or fake payments. Order-status examples appear under Orders → Sample preview and are separate from Actual sandbox orders.
 
-AG Grid Community is available in **Orders → Orders** without a key. The pickup appointment list also works without additional configuration. The optional Bryntum trial timeline is off on Render by default. If your evaluation rights cover the hosted demo, set `VITE_ENABLE_BRYNTUM=true` in Render and choose **Save, rebuild, and deploy**. This is a build-time variable. An AG Studio licence is not an AG Grid Enterprise licence and is not used by this integration.
+AG Grid Community is available in **Orders → Orders** without a key. The pickup appointment list also works without additional configuration. See the carried-forward [Bryntum setup note](docs/restorecart/BRYNTUM_SETUP.md). The optional Bryntum trial timeline is off in the Blueprint by default. If your evaluation rights cover the hosted demo, set `VITE_ENABLE_BRYNTUM=true` in Render and choose **Save, rebuild, and deploy**. This is a build-time variable. An AG Studio licence is not an AG Grid Enterprise licence and is not used by this integration.
 
 ## Approved fixes and optional connector
 
