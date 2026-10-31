@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-31",
+  "scope": "Local standalone changes; not pushed or deployed",
+  "automated": {
+    "tests": 98,
+    "passed": 98,
+    "failed": 0,
+    "skipped": 0,
+    "build": "passed",
+    "architecture_diagrams_parsed": 2
+  },
+  "live_gemini": {
+    "fresh_csv": true,
+    "provider_calls": 1,
+    "cached_repeat_no_new_call": true,
+    "human_confirmation_required": true
+  },
+  "browser": {
+    "sample_published_automatically": true,
+    "tote_search": true,
+    "price_sort": true,
+    "add_to_basket": true,
+    "two_product_edits_survive_one_save": true,
+    "unconfigured_woocommerce_label": true,
+    "seller_editor_mobile_overflow": false,
+    "seller_recovery_mobile_overflow": false,
+    "buyer_directory_mobile_overflow": false,
+    "preview_keyboard_focus_and_escape": true,
+    "restart_preserved_review_and_sample": true,
+    "delayed_optional_table_loading_visible": true,
+    "failed_optional_table_cards_fallback": true
+  },
+  "woo_transport": "injected simulator only; no live connected store",
+  "new_paypal_transaction": false,
+  "hosted_signed_webhook": "not verified in this run",
+  "storage": "temporary SQLite retained; sample seeding is not permanent transaction storage",
+  "remaining_external_validation": [
+    "WooCommerce live test store and API credentials",
+    "Render deployment and signed webhook delivery",
+    "Actual trusted ingress hop count",
+    "Bryntum trial deployment rights throughout judging",
+    "Merchant user trials and final video"
+  ]
+}

@@ -1,3 +1,4 @@
+import { readSavedReview } from "./reviewRecord";
 import { assist } from "./assistant";
 import { assignOwner, owns, requireOwned } from "./accounts";
 import { z } from "zod";
@@ -398,9 +399,25 @@ const contactSchema = z
 export function mountContinuity(router: any, db: DB, seller: any, wrap: any) {
   const get = (path: string, fn: any) => router.get(path, seller, wrap(fn));
   const post = (path: string, fn: any) => router.post(path, seller, wrap(fn));
-  post("/incidents/:id/review", async (req: any, res: any) =>
-    res.json(await assist(db, String(req.params.id), "review")),
+  get("/incidents/:id/review-result", (req: any, res: any) =>
+    res.json(readSavedReview(db, String(req.params.id))),
   );
+  post("/incidents/:id/review", async (req: any, res: any) => {
+    const b = z
+      .object({ fresh: z.boolean().optional() })
+      .strict()
+      .parse(req.body);
+    res.json(
+      await assist(
+        db,
+        String(req.params.id),
+        "review",
+        undefined,
+        fetch,
+        b.fresh || false,
+      ),
+    );
+  });
   post("/incidents/:id/payment-help", async (req: any, res: any) => {
     const body = z.object({ orderId: z.string() }).strict().parse(req.body);
     res.json(await assist(db, String(req.params.id), "payment", body.orderId));
@@ -410,6 +427,7 @@ export function mountContinuity(router: any, db: DB, seller: any, wrap: any) {
       b = z
         .object({
           revision: z.number().int(),
+          action: z.enum(["draft", "ready"]).default("ready"),
           sku: z.string().trim().min(1).max(80),
           name: z.string().trim().min(1).max(160),
           description: z.string().max(1000),
@@ -466,7 +484,11 @@ export function mountContinuity(router: any, db: DB, seller: any, wrap: any) {
         )
       )
         fail("Choose an image uploaded to this shop.");
-      if (!b.excluded) {
+      if (b.action === "ready" && !b.excluded) {
+        if (b.quantity < 1 || b.allocation < 1)
+          fail(
+            "Set aside at least 1 physically counted unit to sell, or hide this product from the shop.",
+          );
         cents(b.price);
         if (!b.confirm)
           fail("Confirm the details and physical count before saving.");
@@ -485,7 +507,7 @@ export function mountContinuity(router: any, db: DB, seller: any, wrap: any) {
         currency: "USD",
         allocation: b.allocation,
         excluded: b.excluded,
-        resolved: b.confirm,
+        resolved: b.action === "ready" && b.confirm,
         resolutionNote: b.resolutionNote,
         imageSourceId: b.imageSourceId || undefined,
       });
@@ -493,7 +515,11 @@ export function mountContinuity(router: any, db: DB, seller: any, wrap: any) {
         ...meta(db, `photos:${id}`),
         [p.sku]: b.imageSourceId,
       });
-      if (b.confirm)
+      putMeta(db, `draft-counts:${id}`, {
+        ...meta(db, `draft-counts:${id}`),
+        [p.sku]: { quantity: b.quantity, allocation: b.allocation },
+      });
+      if (b.action === "ready" && b.confirm)
         putMeta(db, `counts:${id}`, {
           ...meta(db, `counts:${id}`),
           [p.sku]: {

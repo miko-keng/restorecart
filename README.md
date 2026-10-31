@@ -2,6 +2,39 @@
 
 RestoreCart reconstructs a catalog from surviving records, opens a temporary pickup storefront with PayPal sandbox checkout, and returns emergency sales through a duplicate-safe local recovery process. Detailed setup: [RESTORECART_README.md](RESTORECART_README.md).
 
+[Hosted demo](https://restorecart.onrender.com/restorecart) · [Judge access](docs/restorecart/JUDGE_ACCESS.md) · [Three-minute recording guide](DEMO_REHEARSAL_GUIDE.md) · [Submission description](docs/restorecart/SUBMISSION_DESCRIPTION.md) · [Final release status](docs/restorecart/RELEASE_CHECKLIST.md)
+
+## Reviewer guide: resettable sandbox demo and test evidence
+
+**This submission is a sandbox prototype. The default Render Free deployment uses temporary local SQLite; persistent external storage is implemented but is not configured or hosted-restart verified.** New accounts, uploads, baskets, sandbox orders and recovery progress may be lost when the service spins down, restarts or redeploys. The application is not presented as a durable production order system.
+
+| What a reviewer sees | Where it comes from | What a reset means |
+| --- | --- | --- |
+| Prepared Sunday Studio catalog and review draft | Preloaded sample records in the repository | Can be prepared again; prior seller changes are not guaranteed to survive |
+| Sample preview order statuses and pickup appointments | UI-only simulated examples | Reappear from code; never affect PayPal totals, stock or recovery |
+| A buyer's actual PayPal sandbox checkout | PayPal sandbox API plus RestoreCart's running database | The new app order can be lost after a hosting reset; the separate PayPal sandbox transaction is not erased |
+| Seller fulfillment and duplicate-safe local-file recovery | Recorded orders and journals in the running database | Works while records are available; it does not recover a lost database from hardcoded examples |
+
+Pushing this repository to GitHub preserves source code and sample fixtures, **not the running database**. Private operational databases and credentials are intentionally excluded. Shop backup downloads contain catalog/shop data, not orders or payment history.
+
+### Evidence and how to reproduce it
+
+- **Current automated verification:** 114 tests passed on 31 October 2026. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current scope and limitations](docs/restorecart/PARTS_3_4_TEST_REPORT.md).
+- **Historical real sandbox E2E:** the documented local run used live Gemini and a $52 PayPal sandbox capture, followed by fulfillment, backup restoration and duplicate-safe local recovery. The historical 84-test count belongs to that earlier run. [Recorded E2E report](docs/restorecart/FINAL_E2E_REPORT.md).
+- **Local demonstration:** follow the [input/button rehearsal guide](DEMO_REHEARSAL_GUIDE.md) to show actual sandbox checkout, Orders, pickup tracking and recovery in one running session. Clearly identify Sample preview and saved Gemini replay. An edited demonstration should not imply simulated examples are actual payments.
+- **Submission video:** final public video link is pending. The recording should show the local flow and disclose that the free hosted demo may reset. No claim is made here that an unlinked video has already been reviewed.
+- **Hosted verification still pending:** latest deployment, hosted checkout/webhook checks and persistence across a Render restart. Documentation and local tests do not establish those results.
+
+WooCommerce is an optional seller-configured connector. Automated contract tests exist; real-store verification is pending. It is not required to run the supported local Original Store JSON v1 recovery demonstration. External Turso/libSQL storage can be configured later using the [setup and migration guide](docs/restorecart/EXTERNAL_STORAGE.md).
+
+## Latest approved improvements
+
+When deployed, the latest code recreates a labelled published **Sunday Studio Sample Shop** on an empty database, separately from the unresolved seller review draft. This is resettable sample data, not durable transaction storage. Gemini has renewable per-seller quotas, product drafts survive other-product saves, and payment checks expose redacted diagnostics.
+
+[Earlier verification: 98 tests and browser checks](docs/restorecart/APPROVED_FIXES_TEST_REPORT.md) · [Changes and limits](docs/restorecart/APPROVED_FIXES.md) · [Optional WooCommerce test connector](docs/restorecart/WOOCOMMERCE_TEST_CONNECTOR.md) · [Merchant trial protocol](docs/restorecart/MERCHANT_TRIAL_GUIDE.md). WooCommerce is **Not connected** until configured; live integration remains unverified.
+
+Saved Sunday Studio Gemini review can now be replayed with **zero API calls**, labelled with its original date. Order-status samples follow the selected filter. [Replay provenance and verification](docs/restorecart/SAVED_GEMINI_REVIEW.md).
+
 ## Architecture
 
 RestoreCart is one application with separate seller and buyer views. React runs in the browser; an Express server handles authentication, Gemini requests, PayPal sandbox payments and SQLite storage. API keys stay on the server.
@@ -47,6 +80,7 @@ flowchart TB
     Payments -->|"Verify signature before queuing event"| Worker
     Worker --> Payments
     Recovery --> Files
+    Recovery -->|"Optional test-only connection, preview and confirmed return"| Woo["WooCommerce test store<br/>Simple USD managed-stock products<br/>Not connected by default"]
 ```
 
 ### End-to-end flow
@@ -112,22 +146,22 @@ sequenceDiagram
 The buyer approves payment on PayPal; RestoreCart verifies the outcome before marking an order paid. Gemini proposes and explains; it cannot confirm physical stock, publish products, mark payments paid or issue refunds. Seller actions and server validation control those transitions.
 
 - **Shop backup:** saves catalog, evidence, images and shop details for a new unpublished draft or an isolated rehearsal. It excludes accounts, orders and payments; fresh stock confirmation is required after restoration.
-- **Sales recovery:** returns recorded emergency sales, refunds and stock changes through the supported **local Original Store JSON v1 adapter**. It does not automatically update Shopify or WooCommerce, and applying a return does not charge a buyer again.
+- **Sales recovery:** returns recorded emergency sales, refunds and stock changes through the supported **local Original Store JSON v1 adapter**. The local adapter does not update Shopify or WooCommerce. A separate optional WooCommerce test connector previews and returns supported simple-product sales after connection and confirmation; it does not charge a buyer again.
 - **Demo boundary:** prepared records and simulated order-status cards are labelled examples. Simulated cards never enter payment, inventory or recovery records. Actual checkout uses PayPal sandbox. One configured sandbox merchant receives payments; independent seller payout onboarding is not implemented.
 - **Hosting boundary:** SQLite requires persistent storage to retain accounts, uploads and orders across redeploys. The free Render configuration is ephemeral; see [deployment instructions](DEPLOY_RENDER.md).
 
 ## Demo verification and rehearsal
 
-The final local seller/buyer E2E run used live Gemini review and one real PayPal sandbox capture ($52 test funds), then verified pickup tracking, backup restoration and zero-duplicate recovery. After fixing two UI issues, all 84 automated tests and the production build pass. [Read the scoped test report](docs/restorecart/FINAL_E2E_REPORT.md) and [follow the exact input/button guide](DEMO_REHEARSAL_GUIDE.md). This does not establish that the current Render deployment or hosted webhook delivery has been verified.
+The earlier documented local seller/buyer E2E run used live Gemini review and one real PayPal sandbox capture ($52 test funds), then verified pickup tracking, backup restoration and zero-duplicate recovery. At that milestone, 84 automated tests and the production build passed. The current automated suite contains 114 tests; see the reviewer guide above. [Read the scoped test report](docs/restorecart/FINAL_E2E_REPORT.md) and [follow the exact input/button guide](DEMO_REHEARSAL_GUIDE.md). This does not establish that the current Render deployment or hosted webhook delivery has been verified.
 
 ## RestoreCart demo accounts (local practice)
 
 These two accounts have been registered in the local RestoreCart database. Sign in with either the username or email.
 
-| Role | Username | Email | Password | Sign-in page |
-| --- | --- | --- | --- | --- |
+| Role   | Username      | Email                          | Password             | Sign-in page                  |
+| ------ | ------------- | ------------------------------ | -------------------- | ----------------------------- |
 | Seller | `demo-seller` | `seller.demo@restorecart.test` | `RestoreSeller2026!` | `/restorecart/seller/sign-in` |
-| Buyer | `demo-buyer` | `buyer.demo@restorecart.test` | `RestoreBuyer2026!` | `/restorecart/account` |
+| Buyer  | `demo-buyer`  | `buyer.demo@restorecart.test`  | `RestoreBuyer2026!`  | `/restorecart/account`        |
 
 They are public synthetic **RestoreCart app** credentials, not your PayPal sandbox credentials. Use them for local demonstration only. The seller has its own “Sunday Studio Demo” workspace with the example source records; it does not take ownership of earlier shops or orders. No public demo accounts are automatically created by the server. The configured seller receives a prepared Sunday Studio Demo draft when their workspace is empty; registered sellers can use **Load prepared Sunday Studio Demo** to create their own isolated copy.
 
@@ -144,7 +178,7 @@ Buyers sign in once across every shop; no separate shop login is required. Saved
 
 ## Seller interface
 
-The seller workspace has **Shop editor**, **Orders**, and **Recovery**. **Load prepared Sunday Studio Demo** works after hosted sign-in without public demo passwords, uploading files or re-entering shop details. Review remains unfinished for your demonstration. Upload/import and product confirmation share one editor; Gemini assists import, source review and payment explanations. Shop details remain manual. Own draft/published previews replace the buyer-side navigation link. Shop backup download/restore lives in the editor menu, and sales report download lives in Recovery. Gemini is persistently enabled in `restorecart.config.json`; routine tests remain fixtures and existing usage limits still apply.
+The seller workspace has **Shop editor**, **Orders**, **Recovery**, and secondary **Settings**. **Load prepared Sunday Studio Demo** works after hosted sign-in without public demo passwords, uploading files or re-entering shop details. Review remains unfinished for your demonstration. Upload/import and product confirmation share one editor; Gemini assists import, source review and payment explanations. Shop details remain manual. Own draft/published previews replace the buyer-side navigation link. Shop backup download/restore and optional store connections live in Settings, and sales report download lives in Recovery. Gemini is persistently enabled in `restorecart.config.json`; routine tests remain fixtures and existing usage limits still apply.
 
 ## Recovery features in plain language
 
@@ -156,7 +190,6 @@ The seller workspace has **Shop editor**, **Orders**, and **Recovery**. **Load p
 RestoreCart Orders offers custom React cards and an AG Grid Community table with sorting, column filters, quick search and order actions. A pickup appointment list is always available; the Bryntum Scheduler Pro evaluation timeline is optional and enabled locally for evaluation. Set `VITE_ENABLE_BRYNTUM=true` at build time only when your terms cover the hosted demo. AG Studio is a different product and is not used here; its licence is not required for AG Grid Community.
 
 Account passwords are stored with salted scrypt hashes; sessions use HTTP-only cookies and CSRF checks. Registered sellers can access only their own shops, sources, kits, orders and destinations. The configured workspace-owner login retains earlier unassigned shops. This prototype does not yet offer email verification, password recovery, independent merchant onboarding/payouts or production account administration.
-
 
 ## Standalone setup
 
@@ -174,18 +207,19 @@ Open http://127.0.0.1:4370/restorecart. For checks, run `npm test` and `npm run 
 
 See [Render deployment instructions](DEPLOY_RENDER.md) to deploy this repository. No private .env, account database, local merchant orders or API secrets are included. The demo preparation command creates synthetic accounts and a reviewable draft locally; it refuses production. Hosted accounts must be registered privately. Source separation preserves earlier development in the original [ScrapDrop repository](https://github.com/miko-keng/scrapdrop), extracted from commit 7ee04e3.
 
-
 ## Hosted demo and order workspace
 
 After deploying the latest `main`, sign in with the hosted seller credentials configured in Render. An empty configured workspace receives **Sunday Studio Demo** automatically. Other registered sellers can click **Load prepared Sunday Studio Demo**. This authenticated, CSRF-protected setup preserves existing shop reviews, publication and sales. It creates sample records and shop details, not fabricated paid orders or public credentials.
 
-Under **Orders**, expand **Example order statuses — simulated, no payments** for the prebuilt status illustrations. These cards are presentation-only and excluded from order queries, inventory, payment totals and recovery. They are not historical PayPal payments.
+Under **Orders**, select **Sample preview** for six clearly labelled simulated order statuses. The desktop table, mobile cards and pickup schedule share these UI-only examples. They never enter actual order storage, inventory changes, payment totals or recovery exports.
 
-For actual orders:
-
-- **Cards:** existing payment, pickup and refund actions.
-- **Order table:** AG Grid Community sorting, column filters, item/status search and **Open order** actions. No licence key required.
-- **Pickup schedule:** paid orders can have a seller-saved pickup start/end time. The server rejects overlapping bookings at that shop's counter, unpaid/refunded/collected orders and invalid durations. Buyers see appointments in their order history and receipt. A plain list is always available.
-- **Optional Bryntum evaluation timeline:** `VITE_ENABLE_BRYNTUM=true` enables the lazy-loaded Scheduler Pro timeline at build time. Render defaults to false; enable only under applicable evaluation/deployment rights. This is a display of saved appointments, not an invented fulfillment estimate. Vendor trial code is installed from the official public npm alias; installation lifecycle scripts stay disabled through `.npmrc`.
+Switch to **Actual sandbox orders** for buyer purchases. Desktop uses AG Grid Community with sorting, filters and Open order; narrow screens use cards. Pickup schedule displays seller-saved appointments for eligible paid orders; a plain list is always available. The optional Bryntum evaluation timeline requires `VITE_ENABLE_BRYNTUM=true` and applicable evaluation/deployment rights. Sample appointments are illustrative, not actual buyer bookings.
 
 See [migration audit and verification](docs/restorecart/HOSTED_DEMO_AND_ORDERS.md) for the extraction check and limitations.
+
+
+### External persistence and WooCommerce readiness
+
+Free Render compute can use the optional Turso/libSQL adapter. Accounts, binary source uploads, receipts, payment reconciliation and recovery journals are stored directly in the configured remote database. See [setup and guarded migration](docs/restorecart/EXTERNAL_STORAGE.md). Local SQLite remains the development default; external credentials and a hosted restart test are still required. The prototype synchronously waits for SQL worker replies, so remote latency can block other requests; load testing is pending.
+
+WooCommerce Settings provides private URL/credential input when the operator enables a test-store origin, read-only connection testing, explicit recovery preview and separately confirmed return. [Connection setup and supported scope](docs/restorecart/WOOCOMMERCE_TEST_CONNECTOR.md). Automated tests cover uncertain outcomes and duplicate-safe restart recovery. **A real WooCommerce test store and live connector verification are still pending.** No payment is collected again during return.

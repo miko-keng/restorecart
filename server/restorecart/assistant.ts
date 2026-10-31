@@ -1,3 +1,4 @@
+import { rememberReview, reviewFingerprint } from "./reviewRecord";
 import { z } from "zod";
 import { config, claimGeminiCall } from "./reconstruction";
 import { incident, order, type DB } from "./store";
@@ -44,6 +45,7 @@ export async function assist(
   kind: "review" | "payment",
   orderId?: string,
   transport: typeof fetch = fetch,
+  fresh = false,
 ) {
   const shop = incident(db, id),
     sources = sourceList(db, id);
@@ -90,7 +92,9 @@ export async function assist(
   const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const key = hash(
     JSON.stringify([
-      "seller-assist-v1",
+      "seller-assist-v2",
+      id,
+      orderId,
       kind,
       context,
       instruction,
@@ -101,7 +105,7 @@ export async function assist(
   const cached = db
     .prepare("SELECT body FROM rc_cache WHERE key=?")
     .get(key) as any;
-  if (cached) return { ...JSON.parse(cached.body), cached: true };
+  if (cached && !fresh) return { ...JSON.parse(cached.body), cached: true };
   let result: any;
   if (!live) {
     result =
@@ -180,7 +184,7 @@ export async function assist(
                 .map(([k, x]) => [k, portable(x)]),
             )
           : v;
-    claimGeminiCall();
+    claimGeminiCall(db, id);
     const response = await transport(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
       {
@@ -310,10 +314,15 @@ export async function assist(
     source: live ? "gemini" : "fixture",
     model: live ? model : null,
     facts,
+    generatedAt: new Date().toISOString(),
+    ...(kind === "review"
+      ? { inputFingerprint: reviewFingerprint(shop.products, sources) }
+      : {}),
   };
   db.prepare("INSERT OR REPLACE INTO rc_cache VALUES(?,?)").run(
     key,
     JSON.stringify(output),
   );
+  if (kind === "review") rememberReview(db, id, output, shop.products, sources);
   return { ...output, cached: false };
 }

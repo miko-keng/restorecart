@@ -22,7 +22,10 @@ export default function OrderTable({
         headerName: "Order",
         field: "id",
         minWidth: 160,
-        valueFormatter: (p) => String(p.value || "").slice(-8),
+        valueFormatter: (p) =>
+          p.data.sample
+            ? `Sample ${String(p.value).split("-").pop()}`
+            : String(p.value || "").slice(-8),
       },
       {
         headerName: "Items",
@@ -100,6 +103,7 @@ export default function OrderTable({
         <AgGridReact
           theme={themeQuartz}
           rowData={orders}
+          onRowClicked={(event) => event.data && onSelect(event.data.id)}
           columnDefs={columns}
           defaultColDef={{
             sortable: true,

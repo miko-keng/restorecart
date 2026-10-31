@@ -40,6 +40,7 @@ import {
   Zap,
 } from "lucide-react";
 import "./style.css";
+import "./polish.css";
 import { EntryPage, ShopDirectory } from "./PublicPages";
 
 let csrf = "";
@@ -695,7 +696,12 @@ export default function RestoreCartApp() {
         <footer className="rc-footer">
           <Brand />
           <span>A little resilience. A lot of possibility.</span>
-          <span>Sandbox prototype · pickup only</span>
+          <span>
+            Sandbox prototype · pickup only ·{" "}
+            {session?.storage?.externalConfigured
+              ? "External database configured"
+              : "Demo data may reset after restart"}
+          </span>
         </footer>
         <AnimatePresence>
           {busy && (

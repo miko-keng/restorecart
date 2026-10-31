@@ -120,7 +120,7 @@ test("Hosted bootstrap prepares an empty configured owner once and preserves sel
       incident(db, row.id).products[0].resolutionNote,
       "Do not reset",
     );
-    assert.equal(db.prepare("SELECT COUNT(*) n FROM rc_incidents").get()?.n, 1);
+    assert.equal(db.prepare("SELECT COUNT(*) n FROM rc_incidents").get()?.n, 2);
     assert.equal(db.prepare("SELECT COUNT(*) n FROM rc_orders").get()?.n, 0);
   } finally {
     db.close();

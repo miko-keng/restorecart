@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-31T02:16:12.346Z",
+  "kind": "Actual Gemini fresh CSV reconstruction; no PayPal transaction",
+  "passed": true,
+  "calls": 1,
+  "cachedRepeat": true,
+  "variants": [
+    {
+      "sku": "CANDLE-LAV",
+      "price": "14.00",
+      "allocation": 0,
+      "resolved": false
+    },
+    {
+      "sku": "CANDLE-CIT",
+      "price": "16.00",
+      "allocation": 0,
+      "resolved": false
+    }
+  ],
+  "mode": "live"
+}

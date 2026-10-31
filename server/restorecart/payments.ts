@@ -1,3 +1,4 @@
+import { workerEvent } from "./diagnostics";
 import { paypal, paypalReady, verifyWebhook } from "../paypal";
 import { order, lock, commitCapture, tx, cancel, type DB } from "./store";
 import { fail, money } from "./domain";
@@ -332,7 +333,7 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
         );
         await reconcile(o.id, true);
       } catch {
-        /* Persisted state remains available for the next bounded pass. */
+        workerEvent(db, "retry", "payment", order(db, o.id).incident);
       }
     for (const r of db
       .prepare("SELECT order_id FROM rc_refunds WHERE state='checking' LIMIT 5")
@@ -340,7 +341,7 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
       try {
         await refund(r.order_id);
       } catch {
-        /* Still persisted; retry or merchant investigation remains possible. */
+        workerEvent(db, "retry", "refund", order(db, r.order_id).incident);
       }
     }
     for (const e of db
@@ -354,10 +355,11 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
           "UPDATE rc_events SET state='done',error=NULL WHERE id=?",
         ).run(e.id);
       } catch (err) {
+        workerEvent(db, "retry", "webhook");
         db.prepare(
           "UPDATE rc_events SET state='retry',error=?,attempts=attempts+1,next_run=? WHERE id=?",
         ).run(
-          (err as Error).message,
+          "Verified event requires retry",
           Date.now() + Math.min(900000, 15000 * 2 ** Math.min(e.attempts, 6)),
           e.id,
         );

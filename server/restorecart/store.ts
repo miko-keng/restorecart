@@ -1,3 +1,4 @@
+import { remoteDatabase } from "./remoteDatabase";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, chmodSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -12,13 +13,22 @@ import {
 } from "./domain";
 
 export function openRC(
-  path = process.env.RESTORECART_DB_PATH || resolve(".data/restorecart.sqlite"),
+  path = process.env.TURSO_DATABASE_URL ||
+    process.env.RESTORECART_DB_PATH ||
+    resolve(".data/restorecart.sqlite"),
 ) {
-  if (path !== ":memory:")
+  const remote = /^(libsql|https|file):/.test(path);
+  if (!remote && path !== ":memory:")
     mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-  const db = new DatabaseSync(path);
-  if (path !== ":memory:") chmodSync(path, 0o600);
-  db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
+  const db = remote
+    ? remoteDatabase(path, process.env.TURSO_AUTH_TOKEN)
+    : new DatabaseSync(path);
+  if (!remote && path !== ":memory:") chmodSync(path, 0o600);
+  if (!remote)
+    db.exec(
+      "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;",
+    );
+  db.exec(`
     CREATE TABLE IF NOT EXISTS rc_sessions(id TEXT PRIMARY KEY,csrf TEXT NOT NULL,seller INTEGER NOT NULL DEFAULT 0,expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS rc_incidents(id TEXT PRIMARY KEY,slug TEXT UNIQUE NOT NULL,body TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS rc_sources(id TEXT PRIMARY KEY,incident TEXT NOT NULL,name TEXT NOT NULL,mime TEXT NOT NULL,hash TEXT NOT NULL,bytes BLOB NOT NULL,text TEXT NOT NULL,UNIQUE(incident,hash));
@@ -137,6 +147,13 @@ export function viewIncident(db: DB, id: string) {
   const i = incident(db, id);
   return {
     ...i,
+    draftCounts: JSON.parse(
+      (
+        db
+          .prepare("SELECT value FROM rc_meta WHERE key=?")
+          .get(`draft-counts:${id}`) as any
+      )?.value || "{}",
+    ),
     stockCounts: JSON.parse(
       (
         db

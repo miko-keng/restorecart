@@ -4,7 +4,9 @@
     "maxCallsPerRun": 3,
     "maxToolCallsPerRun": 12,
     "maxRunSeconds": 90,
-    "processCallBudget": 6
+    "sellerCallsPerWindow": 12,
+    "globalCallsPerWindow": 60,
+    "windowSeconds": 3600
   },
   "payments": {
     "environment": "sandbox"

@@ -20,13 +20,15 @@
     "restorecart:ai:off": "node --import tsx scripts/restorecart-ai.ts off",
     "restorecart:ai:fixture": "node --import tsx scripts/restorecart-ai.ts fixture",
     "test:restorecart:live-ai": "node --env-file-if-exists=.env --import tsx scripts/restorecart-live-check.ts",
-    "restorecart:demo-accounts": "node --env-file-if-exists=.env --import tsx scripts/restorecart-demo-accounts.ts"
+    "restorecart:demo-accounts": "node --env-file-if-exists=.env --import tsx scripts/restorecart-demo-accounts.ts",
+    "restorecart:storage:migrate": "node --env-file-if-exists=.env --import tsx scripts/restorecart-migrate-storage.ts"
   },
   "dependencies": {
     "@bryntum/schedulerpro": "npm:@bryntum/schedulerpro-trial@7.3.7",
     "@bryntum/schedulerpro-react": "7.3.7",
     "@fontsource-variable/dm-sans": "5.3.0",
     "@fontsource-variable/manrope": "5.3.0",
+    "@libsql/client": "0.18.0",
     "ag-grid-community": "36.2.0",
     "ag-grid-react": "36.2.0",
     "decimal.js": "10.6.0",

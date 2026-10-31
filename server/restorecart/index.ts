@@ -21,12 +21,24 @@ if (
   throw Error(
     "Hosted RestoreCart requires RESTORECART_BASE_URL (HTTPS) and RESTORECART_SELLER_PASSWORD.",
   );
+if (
+  process.env.RESTORECART_REQUIRE_PERSISTENCE === "true" &&
+  !process.env.TURSO_DATABASE_URL
+)
+  throw Error(
+    "External database required. Configure TURSO_DATABASE_URL and TURSO_AUTH_TOKEN; refusing to start with temporary storage.",
+  );
 const runtime = createApp({ base });
 await prepareEmptyConfiguredWorkspace(runtime.db);
 const { app } = runtime;
-app.get("/healthz", (_req, res) =>
-  res.json({ status: "ok", application: "restorecart" }),
-);
+app.get("/healthz", (_req, res) => {
+  try {
+    runtime.db.prepare("SELECT 1 AS ok").get();
+    res.json({ status: "ok", application: "restorecart" });
+  } catch {
+    res.status(503).json({ status: "unavailable", application: "restorecart" });
+  }
+});
 app.get("/", (_req, res) => res.redirect("/restorecart"));
 const brandHTML = (html: string) =>
   html
@@ -74,7 +86,17 @@ app.use((_req, res) =>
 const server = app.listen(port, production ? "0.0.0.0" : "127.0.0.1", () =>
   console.log(`RestoreCart ready at ${base}/restorecart (PayPal sandbox only)`),
 );
-const timer = setInterval(() => void runtime.tick().catch(() => {}), 15000);
+const timer = setInterval(
+  () =>
+    void runtime
+      .tick()
+      .catch(() =>
+        console.warn(
+          JSON.stringify({ event: "restorecart_worker_unavailable" }),
+        ),
+      ),
+  15000,
+);
 timer.unref();
 void runtime.tick();
 for (const sig of ["SIGINT", "SIGTERM"] as const)

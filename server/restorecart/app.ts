@@ -1,3 +1,6 @@
+import { storageStatus } from "./storage";
+import { mountWoo, type WooTransport } from "./woocommerce";
+import { workerEvent, workerStatus } from "./diagnostics";
 import { prepareDemoShop } from "./demo";
 import { pickupWindow, savePickupWindow } from "./pickups";
 import {
@@ -45,7 +48,7 @@ import {
   type DB,
 } from "./store";
 import { addSource, addSample } from "./sources";
-import { reconstruct, status, config } from "./reconstruction";
+import { reconstruct, status, config, aiAllowance } from "./reconstruction";
 import { payments } from "./payments";
 
 export function createApp(
@@ -54,6 +57,8 @@ export function createApp(
     base?: string;
     paymentTransport?: Parameters<typeof payments>[2];
     testPassword?: string;
+    trustedProxyHops?: number;
+    wooTransport?: WooTransport;
   } = {},
 ) {
   if (process.env.PAYPAL_ENV && process.env.PAYPAL_ENV !== "sandbox")
@@ -76,6 +81,12 @@ export function createApp(
   const pay = payments(db, base, options.paymentTransport);
   let working = false;
   app.disable("x-powered-by");
+  const proxyHops =
+    options.trustedProxyHops ??
+    Number(process.env.RESTORECART_TRUST_PROXY_HOPS || 0);
+  if (!Number.isInteger(proxyHops) || proxyHops < 0 || proxyHops > 2)
+    throw Error("Set trusted proxy hops to 0, 1 or 2 only.");
+  app.set("trust proxy", proxyHops);
   app.use(express.json({ limit: "28mb" }));
   app.use((req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -208,6 +219,7 @@ export function createApp(
       user: userFor(db, res.locals.session),
       paypalReady: !!options.paymentTransport || paypalReady(),
       environment: "sandbox",
+      storage: { externalConfigured: !!process.env.TURSO_DATABASE_URL },
     }),
   );
   router.get("/seller-session", (_req, res) =>
@@ -218,6 +230,7 @@ export function createApp(
       ai: status(),
       paypalReady: !!options.paymentTransport || paypalReady(),
       environment: "sandbox",
+      storage: { externalConfigured: !!process.env.TURSO_DATABASE_URL },
       sellerConfigured: !!password,
       ...(!production
         ? {
@@ -242,8 +255,16 @@ export function createApp(
   router.post(
     "/demo/prepare",
     seller,
-    asyncRoute(async (_req, res) => {
-      const shop = await prepareDemoShop(db, res.locals.user.id);
+    asyncRoute(async (req, res) => {
+      const options = z
+        .object({ practice: z.boolean().optional() })
+        .strict()
+        .parse(req.body || {});
+      const shop = await prepareDemoShop(
+        db,
+        res.locals.user.id,
+        options.practice === true,
+      );
       res.json(viewIncident(db, shop.id));
     }),
   );
@@ -253,6 +274,13 @@ export function createApp(
     asyncRoute((req, res) => {
       savePickupWindow(db, parseId(req), req.body);
       res.json(publicOrder(order(db, parseId(req))));
+    }),
+  );
+  router.get("/incidents/:id/operations", seller, (req, res) =>
+    res.json({
+      storage: storageStatus(),
+      ai: aiAllowance(db, res.locals.user.id),
+      worker: workerStatus(db, parseId(req)),
     }),
   );
   router.get("/incidents", seller, (_req, res) =>
@@ -732,6 +760,7 @@ export function createApp(
           .send(JSON.stringify(body, null, 2));
     }),
   );
+  mountWoo(router, db, seller, asyncRoute, options.wooTransport);
   router.get("/health", seller, (_req, res) =>
     res.json({
       ai: status(),
@@ -773,8 +802,12 @@ export function createApp(
       if (working) return;
       working = true;
       try {
+        workerEvent(db, "started");
         expire(db);
         await pay.worker();
+        workerEvent(db, "completed");
+      } catch {
+        workerEvent(db, "retry");
       } finally {
         working = false;
       }

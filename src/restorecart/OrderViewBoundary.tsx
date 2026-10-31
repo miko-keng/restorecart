@@ -1,6 +1,6 @@
 import { Component, type ReactNode } from "react";
 export class OrderViewBoundary extends Component<
-  { children: ReactNode },
+  { children: ReactNode; onFallback?: () => void },
   { failed: boolean }
 > {
   state = { failed: false };
@@ -10,8 +10,10 @@ export class OrderViewBoundary extends Component<
   render() {
     return this.state.failed ? (
       <p role="alert">
-        This order view could not load. Choose Cards to continue managing your
-        orders.
+        This order view could not load.{" "}
+        <button type="button" onClick={this.props.onFallback}>
+          Show order details
+        </button>
       </p>
     ) : (
       this.props.children

@@ -68,12 +68,14 @@ async function fixture() {
         body?: any,
         method?: string,
         withCSRF = true,
+        extraHeaders: Record<string, string> = {},
       ) {
         const r = await fetch(base + "/api/restorecart" + path, {
           method: method || (body === undefined ? "GET" : "POST"),
           headers: {
             "Content-Type": "application/json",
             cookie,
+            ...extraHeaders,
             ...(withCSRF ? { "x-csrf-token": csrf } : {}),
           },
           ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -83,7 +85,7 @@ async function fixture() {
         const data = r.headers.get("content-type")?.includes("application/json")
           ? await r.json()
           : await r.text();
-        if (data.csrf) csrf = data.csrf;
+        if (data?.csrf) csrf = data.csrf;
         return { status: r.status, data };
       },
     };
@@ -110,6 +112,7 @@ async function fixture() {
     seller,
     buyer,
     stranger,
+    client,
     id,
     async close() {
       await new Promise<void>((resolve, reject) =>
@@ -1825,6 +1828,45 @@ test("RestoreCart unified product editor confirms evidence and stock atomically,
       (await f.buyer.request(`/incidents/${f.id}/editor-product`, body)).status,
       403,
     );
+    for (const invalid of [
+      { quantity: 0, allocation: 0 },
+      { allocation: 0 },
+      { resolutionNote: "" },
+      { confirm: false },
+      { quantity: 1.5 },
+      { quantity: -1 },
+    ]) {
+      const rejected = await f.seller.request(
+        `/incidents/${f.id}/editor-product`,
+        { ...body, ...invalid },
+      );
+      assert.equal(rejected.status, 400);
+      assert.equal(incident(f.db, f.id).revision, current.revision);
+    }
+    const draftSaved = await f.seller.request(
+      `/incidents/${f.id}/editor-product`,
+      {
+        ...body,
+        action: "draft",
+        price: "",
+        quantity: 8,
+        allocation: 0,
+        confirm: false,
+        resolutionNote: "",
+      },
+    );
+    assert.equal(draftSaved.status, 200);
+    assert.equal(
+      draftSaved.data.products.find((p: any) => p.sku === "MUG-BLU").resolved,
+      false,
+    );
+    assert.equal(draftSaved.data.draftCounts["MUG-BLU"].quantity, 8);
+    const blockedPublish = await f.seller.request(
+      `/incidents/${f.id}/publish`,
+      { revision: draftSaved.data.revision },
+    );
+    assert.notEqual(blockedPublish.status, 200);
+    body.revision = draftSaved.data.revision;
     const saved = await f.seller.request(
       `/incidents/${f.id}/editor-product`,
       body,
@@ -1850,9 +1892,26 @@ test("RestoreCart unified product editor confirms evidence and stock atomically,
       ).status,
       409,
     );
+    const editedReady = await f.seller.request(
+      `/incidents/${f.id}/editor-product`,
+      {
+        ...body,
+        revision: saved.data.revision,
+        action: "draft",
+        description: "Updated description",
+        confirm: false,
+      },
+    );
+    assert.equal(editedReady.status, 200);
+    const afterEdit = (await f.seller.request(`/incidents/${f.id}/readiness`))
+      .data;
+    assert.equal(
+      afterEdit.products.find((p: any) => p.sku === "MUG-BLU").status,
+      "needs-information",
+    );
     const manual = await f.seller.request(`/incidents/${f.id}/editor-product`, {
       ...body,
-      revision: saved.data.revision,
+      revision: editedReady.data.revision,
       sku: "HAND-001",
       name: "Handmade card",
       price: "4.00",
@@ -2069,6 +2128,172 @@ test("Pickup appointments remain private, reject overlaps and unpaid orders, and
     assert.equal(
       (await f.seller.request(`/orders/${b.id}/pickup-window`, window)).status,
       409,
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+test("Operations and optional WooCommerce setup remain private to the shop owner", async () => {
+  const f = await fixture();
+  try {
+    const ops = await f.seller.request(`/incidents/${f.id}/operations`);
+    assert.equal(ops.status, 200);
+    assert.equal(ops.data.ai.limit, 12);
+    assert.equal(
+      (await f.buyer.request(`/incidents/${f.id}/operations`)).status,
+      403,
+    );
+    assert.equal(
+      (await f.buyer.request(`/incidents/${f.id}/woocommerce`)).status,
+      403,
+    );
+    assert.equal(
+      (await f.seller.request(`/incidents/${f.id}/woocommerce`)).data.connected,
+      false,
+    );
+    await f.stranger.request("/register", {
+      username: "foreign-seller",
+      email: "foreign@restorecart.test",
+      password: "Testing123!",
+      role: "seller",
+    });
+    for (const suffix of ["operations", "woocommerce"])
+      assert.equal(
+        (await f.stranger.request(`/incidents/${f.id}/${suffix}`)).status,
+        403,
+      );
+    assert.equal(
+      (
+        await f.stranger.request(`/incidents/${f.id}/woocommerce/connect`, {
+          url: "https://example.com",
+          key: "ck_x",
+          secret: "cs_x",
+          testStore: true,
+        })
+      ).status,
+      403,
+    );
+    assert.equal(
+      (
+        await f.seller.request(
+          `/incidents/${f.id}/woocommerce/disconnect`,
+          {},
+          "POST",
+          false,
+        )
+      ).status,
+      403,
+    );
+  } finally {
+    await f.close();
+  }
+});
+test("Login throttle ignores forged forwarding by default and separates clients only at configured proxy hop", async () => {
+  const f = await fixture();
+  try {
+    for (let n = 0; n < 12; n++)
+      await f.buyer.request(
+        "/login",
+        { email: "nobody", password: "wrong" },
+        "POST",
+        true,
+        { "x-forwarded-for": `203.0.113.${n + 1}` },
+      );
+    assert.equal(
+      (
+        await f.buyer.request(
+          "/login",
+          { email: "nobody", password: "wrong" },
+          "POST",
+          true,
+          { "x-forwarded-for": "8.8.8.8" },
+        )
+      ).status,
+      429,
+    );
+    f.runtime.app.set("trust proxy", 1);
+    for (let n = 0; n < 12; n++)
+      assert.equal(
+        (
+          await f.buyer.request(
+            "/login",
+            { email: "nobody", password: "wrong" },
+            "POST",
+            true,
+            { "x-forwarded-for": "198.51.100.1" },
+          )
+        ).status,
+        401,
+      );
+    assert.equal(
+      (
+        await f.buyer.request(
+          "/login",
+          { email: "nobody", password: "wrong" },
+          "POST",
+          true,
+          { "x-forwarded-for": "198.51.100.1" },
+        )
+      ).status,
+      429,
+    );
+    assert.equal(
+      (
+        await f.buyer.request(
+          "/login",
+          { email: "nobody", password: "wrong" },
+          "POST",
+          true,
+          { "x-forwarded-for": "198.51.100.2" },
+        )
+      ).status,
+      401,
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+test("Saved Gemini review API is owner-only, stable and never spends model allowance", async () => {
+  const f = await fixture();
+  try {
+    const prepared = (await f.seller.request("/demo/prepare", {})).data;
+    const before = (
+      await f.seller.request(`/incidents/${prepared.id}/operations`)
+    ).data.ai;
+    const first = await f.seller.request(
+      `/incidents/${prepared.id}/review-result`,
+    );
+    const second = await f.seller.request(
+      `/incidents/${prepared.id}/review-result`,
+    );
+    assert.equal(first.status, 200);
+    assert.equal(first.data.savedDemo, true);
+    assert.equal(first.data.stale, false);
+    assert.deepEqual(first.data, second.data);
+    assert.deepEqual(
+      (await f.seller.request(`/incidents/${prepared.id}/operations`)).data.ai,
+      before,
+    );
+    assert.equal(
+      (await f.buyer.request(`/incidents/${prepared.id}/review-result`)).status,
+      403,
+    );
+    await f.stranger.request("/register", {
+      username: "other-reviewer",
+      email: "other-reviewer@restorecart.test",
+      password: "Testing123!",
+      role: "seller",
+    });
+    assert.equal(
+      (await f.stranger.request(`/incidents/${prepared.id}/review-result`))
+        .status,
+      403,
+    );
+    assert.equal(
+      (await f.seller.request(`/incidents/${f.id}/review-result`)).data,
+      null,
     );
   } finally {
     await f.close();

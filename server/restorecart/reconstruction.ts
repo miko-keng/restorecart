@@ -7,6 +7,7 @@ import {
   mergeCandidates,
   type Product,
 } from "./domain";
+import { allowance, claim, quotaOwner } from "./quota";
 import { incident, save, type DB } from "./store";
 import { checkEvidence, deterministicCandidates, sourceList } from "./sources";
 
@@ -28,7 +29,9 @@ export function config() {
         maxCallsPerRun: z.number().int().min(1).max(6),
         maxToolCallsPerRun: z.number().int().min(1).max(16),
         maxRunSeconds: z.number().int().min(1).max(90),
-        processCallBudget: z.number().int().min(0).max(12),
+        sellerCallsPerWindow: z.number().int().min(1).max(100).default(12),
+        globalCallsPerWindow: z.number().int().min(1).max(1000).default(60),
+        windowSeconds: z.number().int().min(60).max(86400).default(3600),
       }),
       payments: z.object({ environment: z.literal("sandbox") }),
       shop: z.object({
@@ -43,12 +46,12 @@ export const status = () => ({
   mode: config().ai.mode,
   model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
   calls,
-  budget: config().ai.processCallBudget,
   configured: !!process.env.GEMINI_API_KEY,
 });
-export function claimGeminiCall() {
-  if (calls >= Math.min(config().ai.processCallBudget, 12))
-    fail("Gemini request budget reached. Saved work is preserved.", 429);
+export const aiAllowance = (db: DB, owner: string) =>
+  allowance(db, owner, config().ai);
+export function claimGeminiCall(db: DB, incidentId: string) {
+  claim(db, quotaOwner(db, incidentId), config().ai);
   calls++;
 }
 export async function reconstruct(
@@ -72,6 +75,8 @@ export async function reconstruct(
     model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const key = hash(
     JSON.stringify([
+      id,
+      quotaOwner(db, id),
       sources.map((s) => [s.id, s.hash, s.columnMapping, s.observedAt]),
       instruction,
       "schema-v1",
@@ -201,7 +206,7 @@ export async function reconstruct(
       toolCount = 0;
     const deadline = Date.now() + Math.min(90000, c.ai.maxRunSeconds * 1000);
     for (let n = 0; n < Math.min(c.ai.maxCallsPerRun, 6) && !proposal; n++) {
-      claimGeminiCall();
+      claimGeminiCall(db, id);
       const response = await transport(
         `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
         {

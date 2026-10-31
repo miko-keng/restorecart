@@ -276,3 +276,188 @@
     position: static;
   }
 }
+
+/* Keep long recovery/connection content usable on narrow displays. */
+.rc-seller-workspace details,
+.rc-seller-workspace form {
+  min-width: 0;
+}
+.rc-seller-workspace input,
+.rc-seller-workspace textarea {
+  max-width: 100%;
+}
+.rc-seller-workspace .rc-return-preview {
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rc-seller-workspace *,
+  .rc-seller-workspace *::before,
+  .rc-seller-workspace *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.rc-seller-workspace .rc-product-confirm label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+.rc-seller-workspace .rc-product-confirm input[type="checkbox"] {
+  flex: none;
+  margin-top: 0.15rem;
+}
+
+/* Base .rc inputs are full-width; native checkboxes must never inherit that width. */
+.rc .rc-seller-workspace input[type="checkbox"] {
+  width: 16px;
+  min-width: 16px;
+  max-width: 16px;
+  height: 16px;
+  min-height: 16px;
+  flex: 0 0 16px;
+  padding: 0;
+  margin: 0.2em 0 0;
+}
+.rc-seller-workspace .rc-product-confirm label > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rc-evidence-row {
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+  overflow-wrap: anywhere;
+}
+.rc-evidence-row small {
+  display: block;
+}
+.rc-evidence-row blockquote {
+  margin: 6px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rc-gemini-actions,
+.rc-gemini-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.rc-gemini-heading h3 {
+  margin: 0;
+}
+.rc-gemini-review h4 {
+  margin: 22px 0 10px;
+}
+.rc-gemini-review article {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.rc-gemini-review article p {
+  margin: 8px 0;
+}
+.rc-gemini-evidence {
+  margin-top: 18px;
+}
+.rc-gemini-evidence a {
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+.rc-gemini-review .rc-review-provenance {
+  font-size: 12px;
+}
+.rc-product-questions > strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink);
+}
+.rc-sample-orders article {
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  padding-top: 14px;
+}
+
+/* One order list; cards are its narrow-screen presentation. */
+.rc-mobile-order {
+  display: none;
+}
+.rc-selected-order {
+  display: block;
+  margin-top: 16px;
+}
+@media (max-width: 700px) {
+  .rc-desktop-orders {
+    display: none;
+  }
+  .rc-mobile-order {
+    display: block;
+  }
+}
+
+.rc-field-with-findings {
+  min-width: 0;
+}
+.rc-field-findings {
+  background: #f1f6e9;
+  border-left: 3px solid #64864b;
+  padding: 12px 14px;
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  border-radius: 6px;
+}
+.rc-field-findings p {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.rc-field-findings small {
+  display: block;
+}
+.rc-field-findings details {
+  margin-top: 8px;
+}
+.rc-field-findings summary {
+  cursor: pointer;
+}
+.rc-field-findings blockquote {
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+
+.rc-product-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.rc-record-table {
+  overflow-x: auto;
+}
+.rc-record-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.rc-record-table th,
+.rc-record-table td {
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid #dce2d2;
+  padding: 12px 8px;
+  overflow-wrap: anywhere;
+}
+.rc-record-table a {
+  display: block;
+  margin-top: 8px;
+}
+.rc-record-table blockquote {
+  margin: 8px 0;
+}
+.rc-supporting-records {
+  margin: 18px 0;
+}

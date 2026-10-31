@@ -1,3 +1,4 @@
+import { readSavedReview } from "../server/restorecart/reviewRecord";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { openRC, createIncident } from "../server/restorecart/store";
@@ -51,6 +52,13 @@ test("Gemini catalog assistance validates cited prices and caches identical requ
     assert.equal(first.source, "gemini");
     assert.equal(second.cached, true);
     assert.equal(counter.n, 1);
+    const fresh = await assist(db, id, "review", undefined, call, true);
+    assert.equal(fresh.cached, false);
+    assert.equal(counter.n, 2);
+    const saved = readSavedReview(db, id)!;
+    assert.equal(saved.savedDemo, false);
+    assert.equal(saved.summary, result.summary);
+    assert.equal(saved.stale, false);
   } finally {
     db.close();
   }

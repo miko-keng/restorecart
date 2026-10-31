@@ -1,4 +1,4 @@
-# Free evaluation service: SQLite is ephemeral. See DEPLOY_RENDER.md.
+# Free compute service. Configure external storage before claiming durable operation; see DEPLOY_RENDER.md.
 services:
   - type: web
     name: restorecart
@@ -30,3 +30,9 @@ services:
         sync: false
       - key: GEMINI_MODEL
         value: gemini-3.5-flash-lite
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      - key: RESTORECART_REQUIRE_PERSISTENCE
+        value: "false"

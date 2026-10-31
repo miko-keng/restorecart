@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "origin": {
+    "kind": "recorded-live-demo",
+    "generatedOn": "2026-10-30",
+    "datePrecision": "day",
+    "model": "gemini-3.5-flash-lite",
+    "evidence": "docs/restorecart/FINAL_E2E_REPORT.md",
+    "originalValidatedOutputHash": "292d9b578cbf3f8ab60bd7b7184f93f92d4be16cb16f9ca9b1b85ea551b2b381",
+    "note": "Genuine validated Gemini response from the recorded live Sunday Studio review. Date known to day precision; no exact generation time was retained. Baseline reconstructed from the original sample sources."
+  },
+  "sources": [
+    {
+      "id": "source_12df5435-5ddf-4ad4-ab1c-d3f90d2cdd59",
+      "name": "sunday-stock-2026-10-26.csv",
+      "hash": "edb9b5c1f8f1539fd19253c90f646ada40ee64dc83bdf7c47b8655d223f0db24"
+    },
+    {
+      "id": "source_717d5d25-b255-4386-a768-d435c02e8f10",
+      "name": "sunday-catalog-2026-10-10.pdf",
+      "hash": "97054e2adb388248ad5a0a8c452b95e9608641a62e3a39999b23210030be6e59"
+    }
+  ],
+  "fingerprint": "3ddd3573ee2bd6761474dc10a7230b477e5b81ee96fa4b1c374acb286adfe9ae",
+  "answer": {
+    "summary": "Reviewed catalog items. Noted a price conflict for MUG-BLU between the CSV file ($20.00) and the PDF catalog ($18.00), and submitted a targeted question to the seller. Descriptions have been suggested based on the CSV source.",
+    "suggestions": [
+      {
+        "sku": "MUG-BLU",
+        "field": "description",
+        "value": "A blue stoneware mug",
+        "reason": "Providing the official product description from the CSV stock sheet.",
+        "sourceId": "source_12df5435-5ddf-4ad4-ab1c-d3f90d2cdd59",
+        "excerpt": "A blue stoneware mug"
+      },
+      {
+        "sku": "MUG-RED",
+        "field": "description",
+        "value": "A warm red stoneware mug",
+        "reason": "Providing the official product description from the CSV stock sheet.",
+        "sourceId": "source_12df5435-5ddf-4ad4-ab1c-d3f90d2cdd59",
+        "excerpt": "A warm red stoneware mug"
+      },
+      {
+        "sku": "TOTE-NAT",
+        "field": "description",
+        "value": "An everyday cotton tote",
+        "reason": "Providing the official product description from the CSV stock sheet.",
+        "sourceId": "source_12df5435-5ddf-4ad4-ab1c-d3f90d2cdd59",
+        "excerpt": "An everyday cotton tote"
+      }
+    ],
+    "questions": [
+      {
+        "sku": "MUG-BLU",
+        "text": "The price for the Blue mug (MUG-BLU) differs between the CSV stock sheet ($20.00) and the PDF catalog ($18.00). Which price is correct?"
+      }
+    ],
+    "omittedSuggestions": 0,
+    "source": "gemini",
+    "model": "gemini-3.5-flash-lite",
+    "facts": null
+  }
+}

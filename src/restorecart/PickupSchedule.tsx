@@ -11,9 +11,9 @@ export default function PickupSchedule({ orders }: { orders: any[] }) {
     <section aria-label="Pickup appointments">
       <h3>Pickup counter schedule</h3>
       <p>
-        Only seller-saved pickup appointments appear here. Use Cards → Schedule
-        pickup time to book a paid order. Buyers see the saved time on their
-        receipt.
+        {orders.some((o) => o.sample)
+          ? "Example appointments for these sample orders. The timeline is read-only."
+          : "Open an order to schedule pickup. Buyers see the saved appointment on their receipt."}
       </p>
       {!appointments.length ? (
         <p>No pickup appointments saved yet.</p>
