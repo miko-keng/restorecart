@@ -297,7 +297,7 @@ test("WooCommerce refuses ambiguous/variable SKUs and stale stock before writes"
           secret: "cs_x",
           testStore: true,
         }),
-      /allowed/,
+      /Disconnect before choosing/,
     );
   } finally {
     f.close();

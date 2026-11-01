@@ -26,13 +26,13 @@ AG Grid Community supplies searchable/filterable order management. Bryntum Sched
 
 ## Challenges and what we learned
 
-Making a storefront appear is easier than maintaining trustworthy state. We separated draft and published catalogs, kept payment uncertainty visible, preserved other unsaved product edits, and tested recovery repetition against retained transaction journals. Recovery currently supports Original Store JSON v1; an optional WooCommerce test connector is implemented but real-store verification remains pending.
+Making a storefront appear is easier than maintaining trustworthy state. We separated draft and published catalogs, kept payment uncertainty visible, preserved other unsaved product edits, and tested recovery repetition against retained transaction journals. Recovery currently supports Original Store JSON v1; an optional self-service WooCommerce test connector accepts seller-entered URL and encrypted credentials without per-store operator approval; real-store verification remains pending.
 
 ## Demonstrated scope and limits
 
 This is a working sandbox prototype, not a production disaster-recovery guarantee. The default free hosted database may reset and lose accounts/orders. Sample order statuses are simulated and do not enter financial or recovery reports. Catalog backups exclude orders and payments. External persistence is optional and not cloud-restart verified. No merchant impact metrics or novice trials are claimed without evidence.
 
-Automated verification: 114 tests passing, covering server workflows, validation, stock/payment idempotency, recovery, storage contracts and connector contracts. A historical real local Gemini + $52 PayPal sandbox journey is documented separately. The release report distinguishes final hosted checks from historical evidence.
+Automated verification: 125 tests passing, covering server workflows, validation, stock/payment idempotency, recovery, storage contracts and connector contracts. A historical real local Gemini + $52 PayPal sandbox journey is documented separately. The hosted release report documents a real $52 sandbox purchase through fulfillment and repeated local recovery on implementation 85c9474. The latest local report separately covers self-service security and recovery-summary changes. No new live WooCommerce or PayPal run is implied by controlled tests.
 
 ## Links
 

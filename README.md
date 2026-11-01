@@ -19,7 +19,7 @@ Pushing this repository to GitHub preserves source code and sample fixtures, **n
 
 ### Evidence and how to reproduce it
 
-- **Current automated verification:** 114 tests passed on 31 October 2026. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current scope and limitations](docs/restorecart/PARTS_3_4_TEST_REPORT.md).
+- **Current automated verification:** 125 tests passed on 1 November 2026; production build passed. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current verification and limitations](docs/restorecart/FINAL_SELF_SERVICE_REPORT.md).
 - **Historical real sandbox E2E:** the documented local run used live Gemini and a $52 PayPal sandbox capture, followed by fulfillment, backup restoration and duplicate-safe local recovery. The historical 84-test count belongs to that earlier run. [Recorded E2E report](docs/restorecart/FINAL_E2E_REPORT.md).
 - **Local demonstration:** follow the [input/button rehearsal guide](DEMO_REHEARSAL_GUIDE.md) to show actual sandbox checkout, Orders, pickup tracking and recovery in one running session. Clearly identify Sample preview and saved Gemini replay. An edited demonstration should not imply simulated examples are actual payments.
 - **Submission video:** final public video link is pending. The recording should show the local flow and disclose that the free hosted demo may reset. No claim is made here that an unlinked video has already been reviewed.
@@ -222,4 +222,23 @@ See [migration audit and verification](docs/restorecart/HOSTED_DEMO_AND_ORDERS.m
 
 Free Render compute can use the optional Turso/libSQL adapter. Accounts, binary source uploads, receipts, payment reconciliation and recovery journals are stored directly in the configured remote database. See [setup and guarded migration](docs/restorecart/EXTERNAL_STORAGE.md). Local SQLite remains the development default; external credentials and a hosted restart test are still required. The prototype synchronously waits for SQL worker replies, so remote latency can block other requests; load testing is pending.
 
-WooCommerce Settings provides private URL/credential input when the operator enables a test-store origin, read-only connection testing, explicit recovery preview and separately confirmed return. [Connection setup and supported scope](docs/restorecart/WOOCOMMERCE_TEST_CONNECTOR.md). Automated tests cover uncertain outcomes and duplicate-safe restart recovery. **A real WooCommerce test store and live connector verification are still pending.** No payment is collected again during return.
+WooCommerce Settings lets each seller enter a public root HTTPS test-store URL and private credentials without per-store operator approval (one server-side encryption key must be configured). Connection testing is read-only; recovery preview and confirmed return are separate actions. [Connection setup and supported scope](docs/restorecart/WOOCOMMERCE_TEST_CONNECTOR.md). Automated tests cover uncertain outcomes and duplicate-safe restart recovery. **A real WooCommerce test store and live connector verification are still pending.** No payment is collected again during return.
+
+## Final self-service and recovery polish — 1 November 2026
+
+In **Settings → Connections**, a visible **WooCommerce** card shows **Not connected** and **Connect store**. Clicking it opens Store URL, consumer key, consumer secret, a test-store confirmation and **Connect / Cancel**. API-key help and supported-use details stay collapsed. Connection checks only read products/orders; credentials are encrypted server-side. No operator needs to approve each shop. One deployment encryption key is required before saving any connections. Private-network targets, redirects and oversized/slow responses are blocked; connection attempts are limited. [Scope and security checks](docs/restorecart/WOOCOMMERCE_TEST_CONNECTOR.md). Real-store recovery is still unverified.
+
+Local recovery now shows returned orders, stock changes, recorded captured/refunded/net amounts, and a **Return verified** result only after a repeat comparison finds no changes. These numbers come from retained orders and inventory events, not hardcoded demo totals. Technical changes are expandable. This proves updating the supported local JSON file; it does not claim an automatic WooCommerce return.
+
+Final verification and submission handoff: [test evidence](docs/restorecart/FINAL_SELF_SERVICE_REPORT.md), [submission checklist and judging evidence](docs/restorecart/SUBMISSION_HANDOFF.md), [updated 2:55 recording script](DEMO_REHEARSAL_GUIDE.md). New local verification is separate from the historical hosted $52 transaction. The public video still needs to be recorded, uploaded and linked.
+
+### WooCommerce connection entry
+
+1. Sign in as a seller and select the rescue shop.
+2. Open **Settings → Connections → WooCommerce → Connect store**.
+3. Enter the public HTTPS store URL, consumer key and consumer secret.
+4. Confirm test-store use, then choose **Connect**. This checks read access before saving credentials encrypted on the server.
+
+The card changes to **Connected** only after a successful connection check. Recovery preview and confirmed return are separate actions. The server needs `WOOCOMMERCE_ENCRYPTION_KEY` configured privately once; this key is not included in GitHub. No per-store operator approval is required.
+
+![WooCommerce connection card](tests/evidence/restorecart-woo-simple.png)

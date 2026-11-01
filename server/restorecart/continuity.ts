@@ -379,6 +379,15 @@ export function applyReconciliation(db: DB, id: string, previewId: string) {
       id: previewId,
       storeId: output.storeId,
       changesApplied: fresh.changes.length,
+      summary: {
+        ordersReturned: fresh.changes.filter((c) => c.kind === "order").length,
+        inventoryChanges: fresh.changes.filter((c) => c.kind === "inventory")
+          .length,
+        alreadyRecorded: fresh.alreadyRecorded,
+        captured: fresh.totals.captured,
+        refunded: fresh.totals.refunded,
+        net: fresh.totals.captured - fresh.totals.refunded,
+      },
       repeated: false,
       output,
       scope:

@@ -1,3 +1,11 @@
+# Self-service release — 1 November 2026
+
+The self-service connector, security checks, actual-data recovery summary and revised demo/submission materials are implemented locally. **125 tests and the production build pass.** See [FINAL_SELF_SERVICE_REPORT.md](FINAL_SELF_SERVICE_REPORT.md) and [SUBMISSION_HANDOFF.md](SUBMISSION_HANDOFF.md). The local server is running at http://localhost:4388/restorecart/seller using the existing rehearsal database; local credential encryption is enabled privately.
+
+This release packages the implementation and updated documentation for GitHub. A successful push is not proof of a successful Render deployment: verify the deployed commit before using the hosted demo. The hosted verification below belongs to implementation 85c9474. Recording/uploading the final public video and submitting Devpost remain human actions. The optional WooCommerce connector needs an actual test store for live validation.
+
+---
+
 # Final release verification — 31 October 2026
 
 ## Agreed scope

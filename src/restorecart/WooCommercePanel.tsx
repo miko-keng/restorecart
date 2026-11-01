@@ -4,11 +4,13 @@ export function WooCommercePanel(p: any) {
     [preview, setPreview] = useState<any>(null),
     [result, setResult] = useState(""),
     [error, setError] = useState(""),
-    [paused, setPaused] = useState(false);
+    [paused, setPaused] = useState(false),
+    [connecting, setConnecting] = useState(false);
   const path = `/incidents/${p.current.id}/woocommerce`;
   useEffect(() => {
     let alive = true;
     setStatus(null);
+    setConnecting(false);
     setPreview(null);
     setResult("");
     setPaused(false);
@@ -25,109 +27,144 @@ export function WooCommercePanel(p: any) {
     };
   }, [p.current.id]);
   return (
-    <details className="rc-panel">
-      <summary>
-        WooCommerce —{" "}
-        {status?.connected ? "Connection tested" : "Not connected"}
-      </summary>
-      <ol
-        className="rc-connection-stages"
-        aria-label="WooCommerce recovery stages"
-      >
-        <li>
-          {status?.connected ? "✓ Connection tested" : "Connect test store"}
-        </li>
-        <li>{preview ? "✓ Recovery preview" : "Preview recovery"}</li>
-        <li>{status?.lastReturn ? "✓ Return checked" : "Confirm return"}</li>
-      </ol>
-      <p>
-        Test-store connector · live recovery not yet independently verified.
-        Connection testing reads records only; no stock or orders are changed.
-      </p>
-      <p>
-        Optional test-store recovery. Downloading sales reports and local
-        recovery files works without connecting.
-      </p>
-      <p>
-        Supports simple USD products with managed stock. Variations and refunded
-        sales require manual recovery. No additional buyer payment is taken.
-      </p>
+    <section
+      className="rc-panel rc-woo-card"
+      aria-label="WooCommerce connection"
+    >
+      <div className="rc-woo-heading">
+        <div>
+          <h3>WooCommerce</h3>
+          <span className="rc-woo-status">
+            {!status
+              ? "Checking…"
+              : status.connected
+                ? "Connected"
+                : "Not connected"}
+          </span>
+        </div>
+        {status && !status.connected && !connecting && (
+          <button className="rc-button" onClick={() => setConnecting(true)}>
+            Connect store
+          </button>
+        )}
+      </div>
+      <p>Connect your store to return emergency orders.</p>
       {error && <p role="alert">{error}</p>}
       {!status ? (
         <p>Checking connection…</p>
-      ) : !status.configured ? (
-        <p>
-          WooCommerce setup is unavailable on this deployment. The connection
-          form is built; an operator must enable your test-store URL and
-          credential encryption first. File recovery remains available.
-        </p>
       ) : !status.connected ? (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const form = e.currentTarget,
-              f = new FormData(form);
-            p.run("Checking test-store connection", async () => {
-              await p.api(path + "/connect", {
-                url: f.get("url"),
-                key: f.get("key"),
-                secret: f.get("secret"),
-                testStore: f.get("testStore") === "on",
+        connecting && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const form = e.currentTarget,
+                f = new FormData(form);
+              setError("");
+              p.run("Connecting store", async () => {
+                try {
+                  await p.api(path + "/connect", {
+                    url: f.get("url"),
+                    key: f.get("key"),
+                    secret: f.get("secret"),
+                    testStore: f.get("testStore") === "on",
+                  });
+                  form.reset();
+                  setStatus(await p.api(path));
+                } catch (e) {
+                  setError(
+                    e instanceof Error
+                      ? e.message
+                      : "Connection failed. Check your store details.",
+                  );
+                }
               });
-              form.reset();
-              setStatus(await p.api(path));
-            });
-          }}
-        >
-          <label>
-            Test store URL
-            <input
-              name="url"
-              type="url"
-              required
-              placeholder="https://your-test-store.example"
-            />
-          </label>
-          <p>
-            In your test store: WooCommerce → Settings → Advanced → REST API.
-            Create a key for this integration with Read/Write access. Enter
-            credentials here, never in chat. Read/Write permits later order
-            recovery; Test connection itself only reads.
-          </p>
-          <label>
-            WooCommerce consumer key
-            <input name="key" type="password" autoComplete="off" required />
-          </label>
-          <label>
-            WooCommerce consumer secret
-            <input name="secret" type="password" autoComplete="off" required />
-          </label>
-          <label>
-            <input name="testStore" type="checkbox" required />
-            This is my test store, not a live merchant shop.
-          </label>
-          <button className="rc-button secondary" disabled={!!p.busy}>
-            Test connection and save
-          </button>
-        </form>
+            }}
+          >
+            {!status.configured && (
+              <p role="status">
+                Connecting is unavailable on this deployment. You can still
+                download reports and use file recovery.
+              </p>
+            )}
+            <label>
+              Store URL
+              <input
+                name="url"
+                type="url"
+                required
+                maxLength={300}
+                autoComplete="url"
+                autoFocus
+                placeholder="https://your-store.com"
+              />
+            </label>
+            <label>
+              WooCommerce consumer key
+              <input
+                name="key"
+                type="password"
+                autoComplete="off"
+                maxLength={128}
+                required
+              />
+            </label>
+            <label>
+              WooCommerce consumer secret
+              <input
+                name="secret"
+                type="password"
+                autoComplete="off"
+                maxLength={128}
+                required
+              />
+            </label>
+            <label>
+              <input name="testStore" type="checkbox" required />
+              I’m connecting a test store.
+            </label>
+            <p>Checks access without changing orders or stock.</p>
+            <details className="rc-woo-help">
+              <summary>Where do I find my API keys?</summary>
+              <p>
+                In WooCommerce, open Settings → Advanced → REST API and create a
+                Read/Write key. Paste its consumer key and secret here.
+              </p>
+            </details>
+            <div className="rc-buttonrow">
+              <button
+                className="rc-button secondary"
+                disabled={!!p.busy || !status.configured}
+              >
+                Connect
+              </button>
+              <button
+                type="button"
+                className="rc-button secondary"
+                onClick={() => {
+                  setConnecting(false);
+                  setError("");
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )
       ) : (
         <>
-          <p>
-            Connected: {status.base}. API access checked; complete a test return
-            to verify this store’s stock behavior.
-          </p>
+          <p>{status.base}</p>
           <button
             className="rc-link"
             disabled={!!p.busy}
             onClick={() =>
-              p.run("Disconnecting test store", async () => {
+              p.run("Disconnecting store", async () => {
                 await p.api(path + "/disconnect", {});
                 setPreview(null);
                 setStatus(await p.api(path));
               })
             }
           >
-            Disconnect test store
+            Disconnect
           </button>
           {!["closing", "closed"].includes(p.current.state) && (
             <p>Stop new orders and resolve payments before comparing.</p>
@@ -138,7 +175,7 @@ export function WooCommercePanel(p: any) {
               !!p.busy || !["closing", "closed"].includes(p.current.state)
             }
             onClick={() =>
-              p.run("Comparing test-store records", async () => {
+              p.run("Comparing store records", async () => {
                 setPreview(await p.api(path + "/compare", {}));
                 setResult("");
                 setPaused(false);
@@ -193,8 +230,8 @@ export function WooCommercePanel(p: any) {
                   checked={paused}
                   onChange={(e) => setPaused(e.target.checked)}
                 />
-                I have paused other sales and stock edits on this test store
-                during the return.
+                I have paused other sales and stock edits on this store during
+                the return.
               </label>
               <button
                 className="rc-button"
@@ -205,7 +242,7 @@ export function WooCommercePanel(p: any) {
                   !preview.changes.length
                 }
                 onClick={() =>
-                  p.run("Returning sales to test store", async () => {
+                  p.run("Returning sales to store", async () => {
                     const r = await p.api(path + "/apply", {
                       previewId: preview.previewId,
                       testStorePaused: true,
@@ -217,13 +254,27 @@ export function WooCommercePanel(p: any) {
                   })
                 }
               >
-                Confirm return to test store
+                Confirm return
               </button>
             </div>
           )}
           {result && <p role="status">{result}</p>}
         </>
       )}
-    </details>
+      <details className="rc-woo-help">
+        <summary>Supported use and connection details</summary>
+        <p>
+          This prototype supports test stores with simple USD products and
+          managed stock. Real-store recovery has not yet been independently
+          verified. Variations and refunded sales need manual recovery. No
+          additional buyer payment is taken.
+        </p>
+        <p>
+          Use a public HTTPS domain without a subfolder or custom port.
+          Credentials are encrypted on the server. If demo data resets,
+          reconnect your store. Revoke the key in WooCommerce when finished.
+        </p>
+      </details>
+    </section>
   );
 }

@@ -45,7 +45,7 @@ Startup now also ensures one **Sunday Studio Sample Shop**, with a stable publis
 
 Gemini quotas renew each hour: 12 calls per seller, 60 globally (configurable). No new key is needed. `RESTORECART_TRUST_PROXY_HOPS=0` is the conservative default; verify Render's actual ingress topology before setting an exact trusted hop count. Do not trust all forwarding headers.
 
-WooCommerce remains **Not connected** unless an operator supplies `WOOCOMMERCE_TEST_ORIGINS` and `WOOCOMMERCE_ENCRYPTION_KEY`. Sellers then enter their test store's consumer credentials privately. See [setup, limitations and verification](docs/restorecart/WOOCOMMERCE_TEST_CONNECTOR.md). Do not configure a live merchant store. A push to `main` can trigger Render Auto-Deploy when enabled. Check the deployed commit in Render before testing.
+WooCommerce connection saving requires `WOOCOMMERCE_ENCRYPTION_KEY` once for the deployment (32 random bytes as 64 hex characters, server-only). Sellers then enter their own public root HTTPS test-store URL and consumer credentials in Settings. No per-store allowlist or operator approval is needed; `WOOCOMMERCE_TEST_ORIGINS` is obsolete. Missing encryption leaves a visible setup notice and disables saving. See [setup, limitations and verification](docs/restorecart/WOOCOMMERCE_TEST_CONNECTOR.md). Do not configure a live merchant store. A push to `main` can trigger Render Auto-Deploy when enabled. Check the deployed commit in Render before testing.
 
 ## Free compute with external persistence (new)
 

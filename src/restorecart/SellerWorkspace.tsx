@@ -1127,72 +1127,77 @@ export function SellerWorkspace(p: Props) {
               </section>
             )}
             {section === "Settings" && (
-              <section className="rc-panel">
-                <h2>Backups and connections</h2>
-                <h3>Data storage</h3>
-                <p>
-                  {operations?.storage?.message ||
-                    "Checking storage configuration…"}
-                </p>
-                <p>
-                  Optional tools for preparing backups and returning sales to
-                  another store.
-                </p>{" "}
-                <details className="rc-backup-menu">
-                  <summary>Shop backup</summary>
-                  <button
-                    className="rc-link"
-                    disabled={!!p.busy || !shop.products.length}
-                    onClick={backup}
-                  >
-                    <Download size={16} />
-                    Download shop backup
-                  </button>
+              <>
+                <section className="rc-panel">
+                  <h2>Connections</h2>
+                  <WooCommercePanel
+                    current={shop}
+                    api={p.api}
+                    run={p.run}
+                    busy={p.busy}
+                  />
+                </section>
+                <section className="rc-panel">
+                  <h2>Backups and storage</h2>
+                  <h3>Data storage</h3>
                   <p>
-                    A backup contains products, pictures and shop details, not
-                    orders. Restoring creates an unpublished shop with fresh
-                    stock checks.
+                    {operations?.storage?.message ||
+                      "Checking storage configuration…"}
                   </p>
-                  <label>
-                    Open backup as
-                    <select
-                      value={restoreMode}
-                      onChange={(e) => setRestoreMode(e.target.value)}
+                  <p>
+                    Optional tools for preparing backups and returning sales to
+                    another store.
+                  </p>{" "}
+                  <details className="rc-backup-menu">
+                    <summary>Shop backup</summary>
+                    <button
+                      className="rc-link"
+                      disabled={!!p.busy || !shop.products.length}
+                      onClick={backup}
                     >
-                      <option value="operational">New shop draft</option>
-                      <option value="rehearsal">
-                        Practice only — no publishing or payments
-                      </option>
-                    </select>
-                  </label>
-                  <label className="rc-link">
-                    Upload shop backup (.json)
-                    <input
-                      className="rc-sr"
-                      type="file"
-                      accept=".json"
-                      disabled={!!p.busy}
-                      onChange={(e) => {
-                        void restore(
-                          e.target.files?.[0],
-                          restoreMode === "rehearsal",
-                        );
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
-                  <small>
-                    Use a backup downloaded from RestoreCart. For CSV, PDF or
-                    pictures, use the product-record upload below.
-                  </small>
-                </details>{" "}
-                <WooCommercePanel
-                  current={shop}
-                  api={p.api}
-                  run={p.run}
-                  busy={p.busy}
-                />
-              </section>
+                      <Download size={16} />
+                      Download shop backup
+                    </button>
+                    <p>
+                      A backup contains products, pictures and shop details, not
+                      orders. Restoring creates an unpublished shop with fresh
+                      stock checks.
+                    </p>
+                    <label>
+                      Open backup as
+                      <select
+                        value={restoreMode}
+                        onChange={(e) => setRestoreMode(e.target.value)}
+                      >
+                        <option value="operational">New shop draft</option>
+                        <option value="rehearsal">
+                          Practice only — no publishing or payments
+                        </option>
+                      </select>
+                    </label>
+                    <label className="rc-link">
+                      Upload shop backup (.json)
+                      <input
+                        className="rc-sr"
+                        type="file"
+                        accept=".json"
+                        disabled={!!p.busy}
+                        onChange={(e) => {
+                          void restore(
+                            e.target.files?.[0],
+                            restoreMode === "rehearsal",
+                          );
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    <small>
+                      Use a backup downloaded from RestoreCart. For CSV, PDF or
+                      pictures, use the product-record upload below.
+                    </small>
+                  </details>{" "}
+                </section>
+              </>
             )}
             {section === "Recovery" && (
               <>

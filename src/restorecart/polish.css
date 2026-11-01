@@ -571,3 +571,57 @@
     animation-duration: 0.01ms !important;
   }
 }
+
+/* Connection entry stays visible; explanations use progressive disclosure. */
+.rc-woo-card .rc-woo-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.rc-woo-card .rc-woo-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.rc-woo-card .rc-woo-heading h3 {
+  margin: 0;
+}
+.rc-woo-status {
+  display: inline-flex;
+  border: 1px solid var(--rc-line, #dce1d3);
+  border-radius: 99px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.rc-woo-card form {
+  display: grid;
+  gap: 14px;
+  max-width: 560px;
+  margin-top: 20px;
+}
+.rc-woo-card form p {
+  margin: 0;
+}
+.rc-woo-card form label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.rc-woo-card form input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin-top: 2px;
+}
+.rc-woo-help {
+  margin-top: 14px;
+  font-size: 13px;
+}
+.rc-woo-help summary {
+  cursor: pointer;
+  font-weight: 600;
+}

@@ -1,11 +1,10 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { lookup } from "node:dns/promises";
-import { request } from "node:https";
-import { isIP } from "node:net";
 import { z } from "zod";
 import { hash, uid, fail } from "./domain";
 import { recovery, tx, type DB } from "./store";
 import { meta, putMeta } from "./continuity";
+import { createWooRequest, storeOrigin } from "./wooNetwork";
+export { publicAddress } from "./wooNetwork";
 export type WooTransport = (
   base: string,
   key: string,
@@ -16,43 +15,16 @@ export type WooTransport = (
 ) => Promise<any>;
 type Connection = { base: string; key: string; secret: string };
 function settings() {
-  const origins = (process.env.WOOCOMMERCE_TEST_ORIGINS || "")
-    .split(",")
-    .filter(Boolean)
-    .map((s) => s.trim());
   const encryption = process.env.WOOCOMMERCE_ENCRYPTION_KEY || "";
-  return {
-    origins,
-    encryption,
-    enabled: /^[a-f0-9]{64}$/i.test(encryption) && origins.length > 0,
-  };
+  return { encryption, enabled: /^[a-f0-9]{64}$/i.test(encryption) };
 }
 function checkBase(base: string) {
-  let u: URL;
-  try {
-    u = new URL(base);
-  } catch {
-    fail("Enter the HTTPS origin of an allowed test store.");
-  }
   if (!settings().enabled)
     fail(
-      "WooCommerce is not configured. File recovery remains available.",
+      "Credential encryption is not enabled on this deployment. File recovery remains available.",
       503,
     );
-  if (
-    u!.protocol !== "https:" ||
-    u!.username ||
-    u!.password ||
-    u!.search ||
-    u!.hash ||
-    u!.pathname !== "/" ||
-    !settings().origins.includes(u!.origin)
-  )
-    fail(
-      "Only an operator-allowed HTTPS test-store origin can be connected.",
-      400,
-    );
-  return u!.origin;
+  return storeOrigin(base);
 }
 function seal(value: Connection) {
   const iv = randomBytes(12),
@@ -87,101 +59,7 @@ function connection(db: DB, id: string): Connection {
     );
   }
 }
-// Allowlisted test origins plus pinned public DNS protect stored credentials from redirects/rebinding.
-export function publicAddress(ip: string) {
-  if (isIP(ip) === 4) {
-    const a = ip.split(".").map(Number);
-    return !(
-      a[0] === 0 ||
-      a[0] === 10 ||
-      a[0] === 127 ||
-      a[0] >= 224 ||
-      (a[0] === 169 && a[1] === 254) ||
-      (a[0] === 172 && a[1] >= 16 && a[1] <= 31) ||
-      (a[0] === 192 && a[1] === 168) ||
-      (a[0] === 100 && a[1] >= 64 && a[1] <= 127) ||
-      (a[0] === 198 && (a[1] === 18 || a[1] === 19))
-    );
-  }
-  // IPv6 only globally routable unicast; mapped IPv4, local and multicast are blocked.
-  return (
-    isIP(ip) === 6 &&
-    /^[23][0-9a-f]{3}:/i.test(ip) &&
-    !ip.toLowerCase().startsWith("2001:db8:")
-  );
-}
-export const wooRequest: WooTransport = async (
-  base,
-  key,
-  secret,
-  path,
-  method = "GET",
-  body,
-) => {
-  checkBase(base);
-  const u = new URL(base + "/wp-json/wc/v3/" + path);
-  const addresses = await lookup(u.hostname, { all: true });
-  if (!addresses.length || addresses.some((a) => !publicAddress(a.address)))
-    fail("Test store must resolve to public HTTPS addresses.");
-  const address = addresses[0];
-  return new Promise((resolve, reject) => {
-    const req = request(
-      u,
-      {
-        method,
-        headers: {
-          Authorization:
-            "Basic " + Buffer.from(key + ":" + secret).toString("base64"),
-          "Content-Type": "application/json",
-          "Cache-Control": "no-store",
-        },
-        lookup: ((_h: any, _o: any, cb: any) =>
-          _o?.all
-            ? cb(null, [address])
-            : cb(null, address.address, address.family)) as any,
-      },
-      (res) => {
-        let bytes = 0;
-        const chunks: Buffer[] = [];
-        res.on("data", (b) => {
-          bytes += b.length;
-          if (bytes > 8_000_000)
-            req.destroy(Error("WooCommerce response exceeded limit"));
-          else chunks.push(b);
-        });
-        res.on("end", () => {
-          if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300)
-            return reject(
-              Error(
-                `WooCommerce request failed (HTTP ${res.statusCode || 0}). Saved work is preserved.`,
-              ),
-            );
-          try {
-            resolve(JSON.parse(Buffer.concat(chunks).toString()));
-          } catch {
-            reject(Error("WooCommerce returned invalid JSON."));
-          }
-        });
-      },
-    );
-    req.setTimeout(20000, () =>
-      req.destroy(
-        Error(
-          "WooCommerce request timed out. Check destination before retrying.",
-        ),
-      ),
-    );
-    req.on("error", () =>
-      reject(
-        Error(
-          "WooCommerce connection failed. Check destination before retrying.",
-        ),
-      ),
-    );
-    if (body) req.write(JSON.stringify(body));
-    req.end();
-  });
-};
+export const wooRequest: WooTransport = createWooRequest();
 export function wooConnector(db: DB, transport: WooTransport = wooRequest) {
   const busy = new Set<string>();
   const leases = new Map<string, string>();
@@ -409,18 +287,56 @@ export function wooConnector(db: DB, transport: WooTransport = wooRequest) {
       const b = z
         .object({
           url: z.string().max(300),
-          key: z.string().regex(/^ck_[a-zA-Z0-9]+$/),
-          secret: z.string().regex(/^cs_[a-zA-Z0-9]+$/),
+          key: z
+            .string()
+            .max(128)
+            .regex(/^ck_[a-zA-Z0-9]+$/),
+          secret: z
+            .string()
+            .max(128)
+            .regex(/^cs_[a-zA-Z0-9]+$/),
           testStore: z.literal(true),
         })
         .strict()
         .parse(input);
       const c = { base: checkBase(b.url), key: b.key, secret: b.secret };
-      await call(c, "products?per_page=1");
-      await call(c, "orders?per_page=1");
       const active = meta(db, `woo-connection:${id}`, null);
       if (active && connection(db, id).base !== c.base)
         fail("Disconnect before choosing a different test store.", 409);
+      // Persist attempts per seller across shops and process restarts. Auth/ownership run first.
+      const hasOwners = db
+        .prepare("SELECT name FROM sqlite_master WHERE name='rc_owners'")
+        .get();
+      const owner = hasOwners
+        ? (
+            db
+              .prepare(
+                "SELECT account_id FROM rc_owners WHERE kind='incident' AND id=?",
+              )
+              .get(id) as any
+          )?.account_id
+        : null;
+      tx(db, () => {
+        const rateKey = `woo-connect-limit:${owner || id}`;
+        const prior = meta(db, rateKey, { start: 0, count: 0 });
+        const rate =
+          Date.now() - prior.start >= 600000
+            ? { start: Date.now(), count: 0 }
+            : prior;
+        if (rate.count >= 10)
+          fail(
+            "Connection attempt limit reached. Wait ten minutes before retrying.",
+            429,
+          );
+        putMeta(db, rateKey, { ...rate, count: rate.count + 1 });
+      });
+      const products = await call(c, "products?per_page=1");
+      const orders = await call(c, "orders?per_page=1");
+      if (!Array.isArray(products) || !Array.isArray(orders))
+        fail(
+          "This store did not return WooCommerce product and order lists. Check its REST API settings.",
+          502,
+        );
       putMeta(db, `woo-connection:${id}`, seal(c));
       putMeta(db, `woo-preview:${id}`, null);
       putMeta(db, `woo-last-return:${id}`, null);

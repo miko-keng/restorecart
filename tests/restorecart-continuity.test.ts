@@ -51,6 +51,14 @@ test("RestoreCart return journal survives a database restart and rejects ambiguo
     const result = applyReconciliation(db, i.id, "P");
     assert.equal(result.output.inventory[0].quantity, 3);
     assert.equal(result.changesApplied, 2);
+    assert.deepEqual(result.summary, {
+      ordersReturned: 1,
+      inventoryChanges: 1,
+      alreadyRecorded: 0,
+      captured: 1000,
+      refunded: 0,
+      net: 1000,
+    });
     db.close();
     db = openRC(path);
     assert.equal(applyReconciliation(db, i.id, "P").repeated, true);

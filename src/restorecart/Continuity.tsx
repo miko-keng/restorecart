@@ -517,6 +517,9 @@ export function RecoveryPanel(p: Props) {
     [applied, setApplied] = useState<any>(null);
   useEffect(() => {
     let alive = true;
+    setInput("");
+    setComparison(null);
+    setApplied(null);
     p.api(`/incidents/${p.current.id}/return-state`)
       .then((saved) => {
         if (alive && saved?.original)
@@ -610,15 +613,43 @@ export function RecoveryPanel(p: Props) {
       </button>
       {comparison && (
         <div className="rc-return-preview">
-          <h3>
-            {comparison.changes.length} changes · {comparison.alreadyRecorded}{" "}
-            orders already recorded
-          </h3>
-          <p>
-            Captured {money(comparison.totals.captured)} · Refunded{" "}
-            {money(comparison.totals.refunded)} · Net{" "}
-            {money(comparison.totals.captured - comparison.totals.refunded)}
-          </p>
+          {comparison.canApply &&
+            comparison.changes.length === 0 &&
+            comparison.alreadyRecorded > 0 && (
+              <div className="rc-recovery-summary" role="status">
+                <h3>Return verified</h3>
+                <p>
+                  <b>
+                    {comparison.alreadyRecorded} order(s) already recorded · 0
+                    new changes
+                  </b>
+                </p>
+                <p>
+                  Recorded net payments:{" "}
+                  {money(
+                    comparison.totals.captured - comparison.totals.refunded,
+                  )}
+                  . No additional order or stock change is needed.
+                </p>
+              </div>
+            )}
+          {!(
+            comparison.canApply &&
+            comparison.changes.length === 0 &&
+            comparison.alreadyRecorded > 0
+          ) && (
+            <>
+              <h3>
+                {comparison.changes.length} changes ·{" "}
+                {comparison.alreadyRecorded} orders already recorded
+              </h3>
+              <p>
+                Captured {money(comparison.totals.captured)} · Refunded{" "}
+                {money(comparison.totals.refunded)} · Net{" "}
+                {money(comparison.totals.captured - comparison.totals.refunded)}
+              </p>
+            </>
+          )}
           {!!comparison.conflicts.length && (
             <div role="alert">
               <h4>Resolve these conflicts first</h4>
@@ -629,24 +660,32 @@ export function RecoveryPanel(p: Props) {
               </ul>
             </div>
           )}
-          <ul>
-            {comparison.changes.map((c: any, index: number) => (
-              <li key={index}>
-                {c.kind === "inventory"
-                  ? `${c.sku}: ${c.units > 0 ? "+" : ""}${c.units} units`
-                  : `${c.action} order ${c.reference}: captured ${money(c.amount)}, refunded ${money(c.refunded)}, ${c.fulfillment}`}
-              </li>
-            ))}
-          </ul>
-          <p>
-            Resulting inventory:{" "}
-            {comparison.inventory
-              .map((s: any) => `${s.sku}: ${s.quantity}`)
-              .join(" · ")}
-          </p>
+          <details>
+            <summary>View changes and resulting inventory</summary>
+            <ul>
+              {comparison.changes.map((c: any, index: number) => (
+                <li key={index}>
+                  {c.kind === "inventory"
+                    ? `${c.sku}: ${c.units > 0 ? "+" : ""}${c.units} units`
+                    : `${c.action} order ${c.reference}: captured ${money(c.amount)}, refunded ${money(c.refunded)}, ${c.fulfillment}`}
+                </li>
+              ))}
+            </ul>
+            <p>
+              Resulting inventory:{" "}
+              {comparison.inventory
+                .map((s: any) => `${s.sku}: ${s.quantity}`)
+                .join(" · ")}
+            </p>
+          </details>
           <button
             className="rc-button secondary"
-            disabled={!comparison.canApply || !!p.busy || !!applied}
+            disabled={
+              !comparison.canApply ||
+              !comparison.changes.length ||
+              !!p.busy ||
+              !!applied
+            }
             onClick={() =>
               p.run("Applying local recovery changes", async () => {
                 const result = await p.api(`/incidents/${p.current.id}/apply`, {
@@ -664,6 +703,31 @@ export function RecoveryPanel(p: Props) {
       {applied && (
         <div className="rc-notice" role="status">
           <div>
+            <h3>
+              {applied.repeated
+                ? "Return already applied"
+                : "Emergency sales returned to your file"}
+            </h3>
+            {applied.summary && (
+              <div className="rc-recovery-summary">
+                <p>
+                  <b>
+                    {applied.repeated ? "Previously returned" : "Returned"}:{" "}
+                    {applied.summary.ordersReturned} order(s) ·{" "}
+                    {applied.summary.inventoryChanges} stock change(s)
+                  </b>
+                </p>
+                <p>
+                  Recorded payments: {money(applied.summary.captured)} captured
+                  · {money(applied.summary.refunded)} refunded ·{" "}
+                  {money(applied.summary.net)} net.
+                </p>
+                <p>
+                  {applied.summary.alreadyRecorded} unchanged order(s) already
+                  recorded. No additional payment was taken.
+                </p>
+              </div>
+            )}
             <b>{applied.changesApplied} local changes applied.</b>
             <p>{applied.scope}</p>
             <a
