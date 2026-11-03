@@ -1,3 +1,5 @@
+import { PayPalConnectionPanel } from "./PayPalConnectionPanel";
+import { DecisionHistory } from "./DecisionHistory";
 import { SupportingRecords } from "./SupportingRecords";
 import { FieldFindings } from "./FieldFindings";
 import {
@@ -48,7 +50,11 @@ const money = (n: number) =>
     n / 100,
   );
 export function SellerWorkspace(p: Props) {
-  const [section, setSection] = useState("Shop editor"),
+  const [section, setSection] = useState(
+      new URLSearchParams(location.search).get("settings") === "payments"
+        ? "Settings"
+        : "Shop editor",
+    ),
     [orderView, setOrderView] = useState("Orders"),
     [sampleMode, setSampleMode] = useState(false),
     [selectedOrder, setSelectedOrder] = useState(""),
@@ -1046,6 +1052,8 @@ export function SellerWorkspace(p: Props) {
                     <div className="rc-desktop-orders">
                       <Suspense fallback={<p>Loading order table…</p>}>
                         <OrderTable
+                          key={`${shop.id}:${sampleMode}`}
+                          storageKey={`${p.session.user?.id}:${shop.id}:${sampleMode}`}
                           orders={visibleOrders}
                           onSelect={setSelectedOrder}
                         />
@@ -1054,7 +1062,14 @@ export function SellerWorkspace(p: Props) {
                   )}
                   {orderView === "Pickup schedule" && (
                     <Suspense fallback={<p>Loading pickup schedule…</p>}>
-                      <PickupSchedule orders={visibleOrders} />
+                      <PickupSchedule
+                        key={`${shop.id}:${sampleMode}`}
+                        orders={visibleOrders}
+                        shopId={shop.id}
+                        api={sampleMode ? undefined : p.api}
+                        onSelect={setSelectedOrder}
+                        onSaved={refreshOrders}
+                      />
                     </Suspense>
                   )}
                 </OrderViewBoundary>
@@ -1130,6 +1145,12 @@ export function SellerWorkspace(p: Props) {
               <>
                 <section className="rc-panel">
                   <h2>Connections</h2>
+                  <PayPalConnectionPanel
+                    current={shop}
+                    api={p.api}
+                    run={p.run}
+                    busy={p.busy}
+                  />
                   <WooCommercePanel
                     current={shop}
                     api={p.api}
@@ -1423,6 +1444,20 @@ function ProductForm({
       fields={fields}
       sources={shop.sources || []}
       change={change}
+      onDecision={(suggestion: any, choice: string) =>
+        change("reviewDecisions", [
+          ...(fields.reviewDecisions || []).filter(
+            (d: any) => d.field !== suggestion.field,
+          ),
+          {
+            field: suggestion.field,
+            value: suggestion.value,
+            sourceId: suggestion.sourceId,
+            choice,
+            fingerprint: review.inputFingerprint,
+          },
+        ])
+      }
     />
   );
 
@@ -1487,6 +1522,7 @@ function ProductForm({
               resolutionNote: fields.resolutionNote || "",
               imageSourceId: fields.imageSourceId,
               create,
+              reviewDecisions: fields.reviewDecisions || [],
             });
             const notice = fields.excluded
               ? "Saved as hidden. This product will not appear in the next published catalog."
@@ -1500,6 +1536,12 @@ function ProductForm({
         );
       }}
     >
+      <DecisionHistory
+        shopId={shop.id}
+        sku={product.sku}
+        revision={shop.revision}
+        api={p.api}
+      />
       {saveNotice && (
         <p className="rc-notice" role="status" aria-live="polite">
           {saveNotice}
@@ -1881,6 +1923,7 @@ function SellerOrder({ order: o, shop, p, refreshed }: any) {
                   await p.api(`/orders/${o.id}/pickup-window`, {
                     start: start.toISOString(),
                     end: end.toISOString(),
+                    expected: o.pickupWindow || null,
                   });
                   await refreshed();
                 });

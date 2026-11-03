@@ -32,7 +32,7 @@ Making a storefront appear is easier than maintaining trustworthy state. We sepa
 
 This is a working sandbox prototype, not a production disaster-recovery guarantee. The default free hosted database may reset and lose accounts/orders. Sample order statuses are simulated and do not enter financial or recovery reports. Catalog backups exclude orders and payments. External persistence is optional and not cloud-restart verified. No merchant impact metrics or novice trials are claimed without evidence.
 
-Automated verification: 125 tests passing, covering server workflows, validation, stock/payment idempotency, recovery, storage contracts and connector contracts. A historical real local Gemini + $52 PayPal sandbox journey is documented separately. The hosted release report documents a real $52 sandbox purchase through fulfillment and repeated local recovery on implementation 85c9474. The latest local report separately covers self-service security and recovery-summary changes. No new live WooCommerce or PayPal run is implied by controlled tests.
+Automated verification: 153 tests passing, covering server workflows, validation, stock/payment idempotency, recovery, storage contracts and connector contracts. A historical real local Gemini + $52 PayPal sandbox journey is documented separately. The hosted release report documents a real $52 sandbox purchase through fulfillment and repeated local recovery on implementation 85c9474. The latest local report separately covers self-service security and recovery-summary changes. No new live WooCommerce or PayPal run is implied by controlled tests.
 
 ## Links
 
@@ -44,3 +44,7 @@ Automated verification: 125 tests passing, covering server workflows, validation
 ## Next steps
 
 Activate and verify external persistence, test the optional connector against a consenting merchant's test store, and run observed merchant trials measuring time to publish and successful reconciliation. These are future validation, not claimed achievements.
+
+Local operational enhancements add source-linked seller decision history, filtered AG Grid financial totals and CSV export, and confirmed Bryntum pickup rescheduling. Six controlled AI validation scenarios are included; these are not a fresh model accuracy benchmark. See [current local report](PRIORITIES_12367_REPORT.md).
+
+Connect PayPal seller onboarding is implemented locally with controlled tests; actual sandbox platform configuration and external consent verification are pending. The existing shared-account sandbox demonstration is not evidence of verified marketplace onboarding.

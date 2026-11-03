@@ -1,9 +1,20 @@
 import { Decimal } from "decimal.js";
-let cached: { token: string; expiry: number } | null = null;
+export type PayPalContext = {
+  merchantId: string;
+  partnerId: string;
+  clientId: string;
+  attributionId: string;
+};
+let cached: { token: string; expiry: number; client: string } | null = null;
 export const paypalReady = () =>
   !!(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
 async function token() {
-  if (cached && cached.expiry > Date.now()) return cached.token;
+  if (
+    cached &&
+    cached.expiry > Date.now() &&
+    cached.client === process.env.PAYPAL_CLIENT_ID
+  )
+    return cached.token;
   const r = await fetch("https://api-m.sandbox.paypal.com/v1/oauth2/token", {
     method: "POST",
     headers: {
@@ -20,6 +31,7 @@ async function token() {
   const b = (await r.json()) as any;
   cached = {
     token: b.access_token,
+    client: process.env.PAYPAL_CLIENT_ID || "",
     expiry: Date.now() + (b.expires_in - 60) * 1000,
   };
   return cached.token;
@@ -29,13 +41,29 @@ export async function paypal(
   method = "GET",
   body?: unknown,
   requestId?: string,
+  seller?: PayPalContext,
 ) {
+  if (
+    seller &&
+    (seller.clientId !== process.env.PAYPAL_CLIENT_ID ||
+      seller.partnerId !== process.env.PAYPAL_PARTNER_MERCHANT_ID)
+  )
+    throw new Error(
+      "The platform credentials changed. Restore the original credentials before processing this order.",
+    );
+  const assertion = seller
+    ? `${Buffer.from(JSON.stringify({ alg: "none" })).toString("base64url")}.${Buffer.from(JSON.stringify({ iss: seller.clientId, payer_id: seller.merchantId })).toString("base64url")}.`
+    : "";
+  const attribution =
+    seller?.attributionId || process.env.PAYPAL_PARTNER_ATTRIBUTION_ID;
   const r = await fetch("https://api-m.sandbox.paypal.com" + path, {
     method,
     headers: {
       Authorization: `Bearer ${await token()}`,
       "Content-Type": "application/json",
       Prefer: "return=representation",
+      ...(assertion ? { "PayPal-Auth-Assertion": assertion } : {}),
+      ...(attribution ? { "PayPal-Partner-Attribution-Id": attribution } : {}),
       ...(requestId ? { "PayPal-Request-Id": requestId } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),

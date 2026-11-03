@@ -1,3 +1,5 @@
+import { rememberReview } from "../server/restorecart/reviewRecord";
+import { sourceList } from "../server/restorecart/sources";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createApp } from "../server/restorecart/app";
@@ -2051,6 +2053,10 @@ test("Pickup appointments remain private, reject overlaps and unpaid orders, and
       start: "2026-11-01T10:00:00+08:00",
       end: "2026-11-01T10:30:00+08:00",
     };
+    const normalizedWindow = {
+      start: new Date(window.start).toISOString(),
+      end: new Date(window.end).toISOString(),
+    };
     assert.equal(
       (await f.seller.request(`/orders/${a.id}/pickup-window`, window)).status,
       409,
@@ -2071,15 +2077,15 @@ test("Pickup appointments remain private, reject overlaps and unpaid orders, and
       window,
     );
     assert.equal(saved.status, 200);
-    assert.deepEqual(saved.data.pickupWindow, window);
+    assert.deepEqual(saved.data.pickupWindow, normalizedWindow);
     assert.deepEqual(
       (await f.buyer.request(`/orders/${a.id}`)).data.pickupWindow,
-      window,
+      normalizedWindow,
     );
     assert.deepEqual(
       (await f.buyer.request("/my-orders")).data.find((o: any) => o.id === a.id)
         .pickupWindow,
-      window,
+      normalizedWindow,
     );
     assert.equal((await f.stranger.request(`/orders/${a.id}`)).status, 403);
     assert.equal(
@@ -2294,6 +2300,198 @@ test("Saved Gemini review API is owner-only, stable and never spends model allow
     assert.equal(
       (await f.seller.request(`/incidents/${f.id}/review-result`)).data,
       null,
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+test("Seller history HTTP records a confirmed source decision atomically and remains owner-only", async () => {
+  const f = await fixture();
+  try {
+    await prepare(f);
+    const shop = incident(f.db, f.id),
+      product = shop.products.find((p) => p.sku === "MUG-BLU")!,
+      source = sourceList(f.db, f.id).find((s) => s.mime === "text/csv")!;
+    rememberReview(
+      f.db,
+      f.id,
+      {
+        summary: "Controlled review",
+        suggestions: [
+          {
+            sku: product.sku,
+            field: "price",
+            value: "20.00",
+            sourceId: source.id,
+            excerpt: "20.00",
+            reason: "Recorded stock sheet",
+          },
+        ],
+        questions: [],
+        model: "controlled-test",
+        generatedAt: new Date().toISOString(),
+      },
+      shop.products,
+      sourceList(f.db, f.id),
+    );
+    const review = (await f.seller.request(`/incidents/${f.id}/review-result`))
+      .data;
+    const body = {
+      revision: shop.revision,
+      action: "ready",
+      sku: product.sku,
+      name: product.name,
+      description: product.description,
+      price: "20.00",
+      quantity: 8,
+      allocation: 3,
+      excluded: false,
+      confirm: true,
+      resolutionNote: "Stock sheet checked",
+      imageSourceId: "",
+      reviewDecisions: [
+        {
+          field: "price",
+          value: "20.00",
+          sourceId: source.id,
+          choice: "accepted",
+          fingerprint: review.inputFingerprint,
+        },
+      ],
+    };
+    const forged = await f.seller.request(`/incidents/${f.id}/editor-product`, {
+      ...body,
+      reviewDecisions: [
+        { ...body.reviewDecisions[0], sourceId: "forged-source" },
+      ],
+    });
+    assert.equal(forged.status, 409);
+    assert.equal(incident(f.db, f.id).revision, shop.revision);
+    const saved = await f.seller.request(
+      `/incidents/${f.id}/editor-product`,
+      body,
+    );
+    assert.equal(saved.status, 200, JSON.stringify(saved.data));
+    const history = await f.seller.request(
+      `/incidents/${f.id}/decision-history?sku=MUG-BLU`,
+    );
+    assert.equal(history.data.length, 1);
+    assert.equal(history.data[0].decisions[0].choice, "accepted");
+    assert.equal(history.data[0].decisions[0].finalValue, "20.00");
+    assert.equal(
+      (await f.seller.request(`/incidents/${f.id}/editor-product`, body))
+        .status,
+      409,
+    );
+    assert.equal(
+      (
+        await f.seller.request(
+          `/incidents/${f.id}/decision-history?sku=MUG-BLU`,
+        )
+      ).data.length,
+      1,
+    );
+    assert.equal(
+      (await f.buyer.request(`/incidents/${f.id}/decision-history?sku=MUG-BLU`))
+        .status,
+      403,
+    );
+    await f.stranger.request("/register", {
+      username: "history-other-seller",
+      email: "history-other@restorecart.test",
+      password: "Testing123!",
+      role: "seller",
+    });
+    assert.equal(
+      (
+        await f.stranger.request(
+          `/incidents/${f.id}/decision-history?sku=MUG-BLU`,
+        )
+      ).status,
+      403,
+    );
+    assert.equal(
+      (await f.stranger.request(`/incidents/${f.id}/pickup-availability`))
+        .status,
+      403,
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+test("Pickup availability and suggested appointment HTTP flow updates buyer receipt and rejects stale confirmation", async () => {
+  const f = await fixture();
+  try {
+    const shop = await prepare(f);
+    const checkout = await f.buyer.request(`/shops/${shop.slug}/orders`, {
+      requestKey: "suggested-pickup",
+      revision: shop.published.revision,
+      lines: [{ sku: "MUG-BLU", quantity: 1 }],
+    });
+    assert.equal(checkout.status, 200);
+    const id = checkout.data.id;
+    const provider = f.pp.get(checkout.data.provider);
+    provider.status = "APPROVED";
+    assert.equal(
+      (await f.buyer.request(`/orders/${id}/check`, {})).status,
+      200,
+    );
+    const day = new Date(Date.now() + 86400000 * 5).toISOString().slice(0, 10),
+      start = `${day}T09:00:00.000Z`,
+      end = `${day}T17:00:00.000Z`;
+    assert.equal(
+      (
+        await f.seller.request(`/incidents/${f.id}/pickup-availability`, {
+          day,
+          timezone: "UTC",
+          start,
+          end,
+        })
+      ).status,
+      200,
+    );
+    const suggestion = await f.seller.request(
+      `/orders/${id}/pickup-suggestion`,
+      { from: start, minutes: 20 },
+    );
+    assert.equal(suggestion.status, 200);
+    assert.equal(suggestion.data.start, start);
+    assert.equal(
+      (await f.seller.request(`/orders/${id}/pickup-window`, suggestion.data))
+        .status,
+      200,
+    );
+    const receipt = await f.buyer.request(`/orders/${id}`);
+    assert.deepEqual(receipt.data.pickupWindow, {
+      start,
+      end: `${day}T09:20:00.000Z`,
+    });
+    assert.equal(
+      (await f.seller.request(`/orders/${id}/pickup-window`, suggestion.data))
+        .status,
+      409,
+    );
+    assert.equal(
+      (
+        await f.buyer.request(`/orders/${id}/pickup-suggestion`, {
+          from: start,
+          minutes: 20,
+        })
+      ).status,
+      403,
+    );
+    assert.equal(
+      (
+        await f.seller.request(
+          `/incidents/${f.id}/pickup-availability`,
+          { day, timezone: "UTC", start, end },
+          "POST",
+          false,
+        )
+      ).status,
+      403,
     );
   } finally {
     await f.close();

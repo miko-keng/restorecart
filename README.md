@@ -19,7 +19,7 @@ Pushing this repository to GitHub preserves source code and sample fixtures, **n
 
 ### Evidence and how to reproduce it
 
-- **Current automated verification:** 125 tests passed on 1 November 2026; production build passed. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current verification and limitations](docs/restorecart/FINAL_SELF_SERVICE_REPORT.md).
+- **Current automated verification:** 153 tests passed on 3 November 2026; production build passed. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current verification and limitations](docs/restorecart/PAYPAL_SELLER_CONNECTION.md).
 - **Historical real sandbox E2E:** the documented local run used live Gemini and a $52 PayPal sandbox capture, followed by fulfillment, backup restoration and duplicate-safe local recovery. The historical 84-test count belongs to that earlier run. [Recorded E2E report](docs/restorecart/FINAL_E2E_REPORT.md).
 - **Local demonstration:** follow the [input/button rehearsal guide](DEMO_REHEARSAL_GUIDE.md) to show actual sandbox checkout, Orders, pickup tracking and recovery in one running session. Clearly identify Sample preview and saved Gemini replay. An edited demonstration should not imply simulated examples are actual payments.
 - **Submission video:** final public video link is pending. The recording should show the local flow and disclose that the free hosted demo may reset. No claim is made here that an unlinked video has already been reviewed.
@@ -34,6 +34,31 @@ When deployed, the latest code recreates a labelled published **Sunday Studio Sa
 [Earlier verification: 98 tests and browser checks](docs/restorecart/APPROVED_FIXES_TEST_REPORT.md) · [Changes and limits](docs/restorecart/APPROVED_FIXES.md) · [Optional WooCommerce test connector](docs/restorecart/WOOCOMMERCE_TEST_CONNECTOR.md) · [Merchant trial protocol](docs/restorecart/MERCHANT_TRIAL_GUIDE.md). WooCommerce is **Not connected** until configured; live integration remains unverified.
 
 Saved Sunday Studio Gemini review can now be replayed with **zero API calls**, labelled with its original date. Order-status samples follow the selected filter. [Replay provenance and verification](docs/restorecart/SAVED_GEMINI_REVIEW.md).
+
+## Seller PayPal connection
+
+Open **Seller Settings → Connections → PayPal payments → Connect PayPal**. The seller signs in on PayPal and grants payment/refund permission; RestoreCart verifies the merchant and permissions server-side before enabling seller checkout. Orders retain their original merchant for capture and refund even if the shop later disconnects. No seller PayPal password or API secret is entered into RestoreCart.
+
+**Activation is pending:** the current local configuration has single-merchant checkout credentials, but no platform merchant ID or attribution ID. The panel displays Not connected and explains that setup is unavailable. Configure a sandbox **Platform REST app** with Partner Referrals access to activate it. Sandbox testing can precede live partner approval; this app remains sandbox-only. [Setup, security checks and current verification](docs/restorecart/PAYPAL_SELLER_CONNECTION.md).
+
+The existing single-account demo remains available when platform configuration is entirely absent; it is explicitly labelled as using a shared sandbox account. Valid platform configuration, strict mode, or any saved shop connection prevents an unconnected shop from silently falling back to that account. Historical shared-account orders are not migrated to another merchant by connecting a seller.
+
+## Order operations, decision history and pickup scheduling
+
+The core import → review → publish → checkout → recovery flow stays the same. These improvements add operational controls without requiring a new recording of that flow.
+
+| Improvement | How to use it |
+| --- | --- |
+| Seller decision history | Use a field-level suggestion or choose **Keep current value**, then save the product. Expand **Seller decision history** to see accepted, rejected or overridden suggestions, final values, supporting source hashes, seller and timestamp. Clicking alone does not record a saved decision. |
+| AG Grid order workspace | In Orders → Order table, choose All, Needs attention, To prepare or Unscheduled pickups. Search and filter amounts in USD. The captured/refunded/net totals follow the visible rows; export filtered CSV or reset the table. Table preferences survive navigation in the same browser session. |
+| Bryntum pickup planning | In Orders → Pickup schedule, save opening dates, find the next available slot and confirm it. Dragging an eligible appointment proposes a change; **Confirm appointment** saves it. Keyboard-accessible forms provide the same rescheduling path. Click an appointment to open its order. |
+| Payment and stock safeguards | Server checks reject overlapping appointments, outdated edits and ineligible orders. Buyer receipts show saved pickup changes. Concurrent checkout, repeated capture/refund notifications and interrupted refunds have automated regression coverage. |
+
+The schedule supports one counter and one opening window per date, in a fixed shop time zone. Dates crossing midnight are not supported. Sample orders remain separate, read-only examples and never change payments, stock or recovery. AG Grid uses Community features; AG Studio is not required. Bryntum remains an optional evaluation dependency with an appointment-list fallback; see [setup and licensing limits](docs/restorecart/BRYNTUM_SETUP.md).
+
+Decision history is append-only through the application and shows the latest 100 entries for a product. It shares the database's retention limits: temporary hosted storage can lose history on restart. It is not a tamper-proof external audit service.
+
+Run `npm test` for the full suite, `npm run test:ai-evals` for six focused AI validation scenarios, and `npm run build` for production checks. AI evaluations use controlled responses to test conflict handling, missing information, ambiguous photos, invented citations and document prompt injection. They do not measure fresh Gemini model accuracy and make no model API calls. [Results, browser evidence and limitations](docs/restorecart/PRIORITIES_12367_REPORT.md).
 
 ## Architecture
 
@@ -152,7 +177,7 @@ The buyer approves payment on PayPal; RestoreCart verifies the outcome before ma
 
 ## Demo verification and rehearsal
 
-The earlier documented local seller/buyer E2E run used live Gemini review and one real PayPal sandbox capture ($52 test funds), then verified pickup tracking, backup restoration and zero-duplicate recovery. At that milestone, 84 automated tests and the production build passed. The current automated suite contains 114 tests; see the reviewer guide above. [Read the scoped test report](docs/restorecart/FINAL_E2E_REPORT.md) and [follow the exact input/button guide](DEMO_REHEARSAL_GUIDE.md). For the newer hosted verification, see the [hosted release report](docs/restorecart/HOSTED_RELEASE_REPORT.md); independent hosted webhook delivery remains unverified.
+The earlier documented local seller/buyer E2E run used live Gemini review and one real PayPal sandbox capture ($52 test funds), then verified pickup tracking, backup restoration and zero-duplicate recovery. At that milestone, 84 automated tests and the production build passed. The current automated suite contains 153 tests; see the reviewer guide above. [Read the scoped test report](docs/restorecart/FINAL_E2E_REPORT.md) and [follow the exact input/button guide](DEMO_REHEARSAL_GUIDE.md). For the newer hosted verification, see the [hosted release report](docs/restorecart/HOSTED_RELEASE_REPORT.md); independent hosted webhook delivery remains unverified.
 
 ## RestoreCart demo accounts (local practice)
 

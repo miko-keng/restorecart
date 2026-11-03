@@ -1,3 +1,4 @@
+import { connectionEvent, verifyConnection } from "./paypalConnections";
 import { workerEvent } from "./diagnostics";
 import { paypal, paypalReady, verifyWebhook } from "../paypal";
 import { order, lock, commitCapture, tx, cancel, type DB } from "./store";
@@ -9,6 +10,11 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
     "CREATE TABLE IF NOT EXISTS rc_adjustments(id TEXT PRIMARY KEY,order_id TEXT NOT NULL,amount INTEGER NOT NULL,kind TEXT NOT NULL,body TEXT NOT NULL)",
   );
   const busy = new Set<string>();
+  const forOrder = (id: string) => {
+    const destination = order(db, id).snapshot.paymentDestination;
+    return (path: string, method = "GET", body?: unknown, requestId?: string) =>
+      transport(path, method, body, requestId, destination || undefined);
+  };
   async function ensure(id: string) {
     let o = order(db, id);
     if (o.provider && o.merchant && o.snapshot.approvalUrl) return o;
@@ -16,10 +22,18 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
       fail("Checkout is no longer available.", 409);
     if (transport === paypal && !paypalReady())
       fail("PayPal sandbox is not configured. No payment was created.", 503);
-    const expected = process.env.PAYPAL_MERCHANT_ID || "";
+    const destination = o.snapshot.paymentDestination;
+    if (destination) {
+      const status = await verifyConnection(db, o.incident, transport);
+      if (status.merchantId !== destination.merchantId)
+        fail("The shop's PayPal account changed. Start a new checkout.", 409);
+    }
+    const send = forOrder(id);
+    const expected =
+      destination?.merchantId || process.env.PAYPAL_MERCHANT_ID || "";
     const p = o.provider
-      ? await transport(`/v2/checkout/orders/${o.provider}`)
-      : await transport(
+      ? await send(`/v2/checkout/orders/${o.provider}`)
+      : await send(
           "/v2/checkout/orders",
           "POST",
           {
@@ -55,7 +69,7 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
     db.prepare("UPDATE rc_orders SET provider=? WHERE id=?").run(p.id, id);
     const full = p.purchase_units?.[0]?.payee?.merchant_id
       ? p
-      : await transport(`/v2/checkout/orders/${p.id}`);
+      : await send(`/v2/checkout/orders/${p.id}`);
     const pu = full.purchase_units?.[0],
       merchant = pu?.payee?.merchant_id;
     if (
@@ -129,7 +143,8 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
         else return o;
       }
       if (o.capture) return o;
-      let p = await transport(`/v2/checkout/orders/${o.provider}`);
+      const send = forOrder(id);
+      let p = await send(`/v2/checkout/orders/${o.provider}`);
       if (
         p.status === "APPROVED" &&
         [
@@ -142,7 +157,7 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
       ) {
         lock(db, id);
         try {
-          p = await transport(
+          p = await send(
             `/v2/checkout/orders/${o.provider}/capture`,
             "POST",
             {},
@@ -227,9 +242,10 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
     db.prepare(
       "INSERT OR IGNORE INTO rc_refunds(order_id,state,amount) VALUES(?,'checking',?)",
     ).run(id, o.amount);
+    const send = forOrder(id);
     const r = existing?.provider
-      ? await transport(`/v2/payments/refunds/${existing.provider}`)
-      : await transport(
+      ? await send(`/v2/payments/refunds/${existing.provider}`)
+      : await send(
           `/v2/payments/captures/${o.capture}/refund`,
           "POST",
           { amount: { value: money(o.amount), currency_code: "USD" } },
@@ -273,6 +289,7 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
     return order(db, id);
   }
   async function processEvent(e: any) {
+    if (await connectionEvent(db, e, transport)) return;
     const related = e.resource?.supplementary_data?.related_ids || {};
     let captureId = related.capture_id;
     if (
@@ -293,8 +310,9 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
       .prepare("SELECT id FROM rc_orders WHERE provider=? OR capture=?")
       .get(related.order_id || e.resource?.id || "", captureId || "") as any;
     if (!found) fail("Webhook has no matching RestoreCart order.", 409);
+    const send = forOrder(found.id);
     if (e.event_type === "PAYMENT.CAPTURE.REFUNDED") {
-      const r = await transport(
+      const r = await send(
         `/v2/payments/refunds/${encodeURIComponent(e.resource.id)}`,
       );
       if (r.status !== "COMPLETED") fail("Refund is still pending.", 409);
@@ -303,7 +321,7 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
         "UPDATE rc_refunds SET state='completed' WHERE order_id=? AND provider=?",
       ).run(found.id, r.id);
     } else if (e.event_type === "PAYMENT.CAPTURE.REVERSED") {
-      const c = await transport(`/v2/payments/captures/${captureId}`);
+      const c = await send(`/v2/payments/captures/${captureId}`);
       if (c.status !== "REVERSED") fail("Reversal is not confirmed.", 409);
       adjustment(
         found.id,

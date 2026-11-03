@@ -1,8 +1,18 @@
+import {
+  mountPayPalConnections,
+  paymentDestination,
+} from "./paypalConnections";
 import { storageStatus } from "./storage";
 import { mountWoo, type WooTransport } from "./woocommerce";
 import { workerEvent, workerStatus } from "./diagnostics";
 import { prepareDemoShop } from "./demo";
-import { pickupWindow, savePickupWindow } from "./pickups";
+import {
+  pickupWindow,
+  savePickupWindow,
+  pickupAvailability,
+  savePickupAvailability,
+  suggestPickupWindow,
+} from "./pickups";
 import {
   accountTables,
   seedConfiguredAccount,
@@ -176,6 +186,14 @@ export function createApp(
         .catch(next);
     };
   mountAccounts(router, db, asyncRoute, production);
+  mountPayPalConnections(
+    router,
+    db,
+    seller,
+    asyncRoute,
+    base,
+    options.paymentTransport,
+  );
   mountContinuity(router, db, seller, asyncRoute);
   const parseId = (req: express.Request, key = "id") => String(req.params[key]);
   function readable(req: express.Request, res: express.Response) {
@@ -267,6 +285,23 @@ export function createApp(
       );
       res.json(viewIncident(db, shop.id));
     }),
+  );
+  router.get("/incidents/:id/pickup-availability", seller, (req, res) =>
+    res.json(pickupAvailability(db, parseId(req))),
+  );
+  router.post(
+    "/incidents/:id/pickup-availability",
+    seller,
+    asyncRoute((req, res) =>
+      res.json(savePickupAvailability(db, parseId(req), req.body)),
+    ),
+  );
+  router.post(
+    "/orders/:id/pickup-suggestion",
+    seller,
+    asyncRoute((req, res) =>
+      res.json(suggestPickupWindow(db, parseId(req), req.body)),
+    ),
   );
   router.post(
     "/orders/:id/pickup-window",
@@ -626,6 +661,7 @@ export function createApp(
         randomBytes(32).toString("hex"),
         b.revision,
         b.lines,
+        paymentDestination(db, row.id),
       );
       try {
         o = await pay.ensure(o.id);

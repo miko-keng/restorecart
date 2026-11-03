@@ -303,7 +303,9 @@ export default function RestoreCartApp() {
     loadList()
       .then(async (all) => {
         if (!alive) return;
-        const id = sessionStorage.getItem("rc-current");
+        const id =
+          new URLSearchParams(location.search).get("shop") ||
+          sessionStorage.getItem("rc-current");
         if (all.length) await load(preferredShop(all, id)!);
       })
       .catch((e) => {

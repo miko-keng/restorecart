@@ -1,3 +1,11 @@
+## Seller PayPal connection update — 3 November 2026
+
+**153 automated tests and production build pass locally.** Connect PayPal UI and server authorization flow are implemented; actual platform sandbox activation and external consent testing remain pending the platform app configuration. See [setup and verification](PAYPAL_SELLER_CONNECTION.md). Included in this source release; hosted deployment remains unverified.
+
+## Local operational update — 3 November 2026
+
+Priorities 1, 2, 3, 6 and 7 are implemented. At that verification milestone, **143 tests passed**, including six controlled AI validation scenarios; the production build passes. See [results and evidence](PRIORITIES_12367_REPORT.md). These changes are included in this source release; Render verification remains pending. Earlier release and server status below is historical.
+
 # Self-service release — 1 November 2026
 
 The self-service connector, security checks, actual-data recovery summary and revised demo/submission materials are implemented locally. **125 tests and the production build pass.** See [FINAL_SELF_SERVICE_REPORT.md](FINAL_SELF_SERVICE_REPORT.md) and [SUBMISSION_HANDOFF.md](SUBMISSION_HANDOFF.md). The local server is running at http://localhost:4388/restorecart/seller using the existing rehearsal database; local credential encryption is enabled privately.

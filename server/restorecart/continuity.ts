@@ -1,3 +1,8 @@
+import {
+  decisionInput,
+  recordProductDecision,
+  decisionHistory,
+} from "./decisions";
 import { readSavedReview } from "./reviewRecord";
 import { assist } from "./assistant";
 import { assignOwner, owns, requireOwned } from "./accounts";
@@ -431,6 +436,10 @@ export function mountContinuity(router: any, db: DB, seller: any, wrap: any) {
     const body = z.object({ orderId: z.string() }).strict().parse(req.body);
     res.json(await assist(db, String(req.params.id), "payment", body.orderId));
   });
+  get("/incidents/:id/decision-history", (req: any, res: any) => {
+    const sku = z.string().min(1).max(80).parse(req.query.sku);
+    res.json(decisionHistory(db, String(req.params.id), sku));
+  });
   post("/incidents/:id/editor-product", (req: any, res: any) => {
     const id = String(req.params.id),
       b = z
@@ -446,6 +455,7 @@ export function mountContinuity(router: any, db: DB, seller: any, wrap: any) {
           excluded: z.boolean(),
           confirm: z.boolean(),
           create: z.boolean().default(false),
+          reviewDecisions: z.array(decisionInput).max(12).default([]),
           resolutionNote: z.string().max(1000),
           imageSourceId: z.string(),
         })
@@ -477,6 +487,11 @@ export function mountContinuity(router: any, db: DB, seller: any, wrap: any) {
         };
         i.products.push(p);
       }
+      const before = structuredClone(p);
+      const previousCount =
+        meta(db, `draft-counts:${id}`)[p.sku]?.quantity ??
+        meta(db, `counts:${id}`)[p.sku]?.quantity ??
+        null;
       const committed = p.allocation - available(db, id, p.sku, p.allocation);
       if (
         b.allocation < committed ||
@@ -519,6 +534,10 @@ export function mountContinuity(router: any, db: DB, seller: any, wrap: any) {
         resolved: b.action === "ready" && b.confirm,
         resolutionNote: b.resolutionNote,
         imageSourceId: b.imageSourceId || undefined,
+      });
+      recordProductDecision(db, id, res.locals.user.id, before, p, {
+        ...b,
+        previousCount,
       });
       putMeta(db, `photos:${id}`, {
         ...meta(db, `photos:${id}`),

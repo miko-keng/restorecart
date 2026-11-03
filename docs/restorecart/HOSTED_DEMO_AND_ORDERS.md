@@ -40,3 +40,7 @@ Official references:
 - AG Grid React installation: https://www.ag-grid.com/react-data-grid/installation/
 - Bryntum React trial setup: https://bryntum.com/products/schedulerpro/docs/guide/SchedulerPro/quick-start/react
 - Public trial registry: https://bryntum.com/products/scheduler/docs-llm/guide/Scheduler/npm/repository/public-repository-access.md
+
+## Local operational update — 3 November 2026
+
+The current local implementation adds confirmed drag rescheduling, opening dates, next-slot suggestions and keyboard-accessible scheduling forms. This supersedes the earlier read-only timeline description for actual orders; samples remain read-only. See [current verification](PRIORITIES_12367_REPORT.md). Deployment of these changes is not asserted by this historical hosted report.

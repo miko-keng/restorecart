@@ -6,6 +6,7 @@ export function FieldFindings({
   fields,
   sources,
   change,
+  onDecision,
 }: any) {
   const questions = (review?.questions || []).filter(
     (q: any) => q.sku === product.sku && findingField(q.text) === field,
@@ -69,6 +70,20 @@ export function FieldFindings({
             ? sources.find((x: any) => x.id === s.value)?.name ||
               "Suggested variant photo"
             : s.value;
+        const choice = (fields.reviewDecisions || []).find(
+          (d: any) =>
+            d.field === s.field &&
+            d.value === s.value &&
+            d.sourceId === s.sourceId &&
+            d.fingerprint === review.inputFingerprint,
+        );
+        if (choice?.choice === "rejected")
+          return (
+            <p key={`s:${i}`}>
+              Kept current {field === "imageSourceId" ? "photo" : field}. Save
+              this product to record your decision.
+            </p>
+          );
         return (
           <div key={`s:${i}`}>
             <strong>✦ Suggested change</strong>
@@ -92,11 +107,24 @@ export function FieldFindings({
                 type="button"
                 className="rc-link"
                 disabled={review.stale || s.applicable === false}
-                onClick={() => change(field, s.value)}
+                onClick={() => {
+                  change(field, s.value);
+                  onDecision?.(s, "accepted");
+                }}
               >
                 Use suggestion
               </button>
             }
+            {onDecision && (
+              <button
+                type="button"
+                className="rc-link"
+                onClick={() => onDecision(s, "rejected")}
+              >
+                Keep current value
+              </button>
+            )}
+            <small>Decisions are recorded when you save this product.</small>
             <details>
               <summary>View source</summary>
               <p>{s.reason}</p>
