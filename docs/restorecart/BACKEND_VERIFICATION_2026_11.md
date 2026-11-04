@@ -39,7 +39,15 @@ A private, consistent snapshot preserved the local rehearsal database before mig
 
 Local `.env` now selects Turso and requires persistence; existing demo checkout credentials are preserved separately from the private Platform verification configuration. The original rehearsal SQLite file and private pre-migration snapshot remain unchanged.
 
-A Render rebuild/restart check is tracked separately. Remote database verification alone does not prove the hosted deployment is configured correctly. See the hosted report when available.
+## Actual Render activation and restart
+
+Deployment `46bd647` became live with Turso configured. The initial migration startup exposed a configured-email collision; the fix preserves registered accounts and passwords instead of trying to create a duplicate bootstrap identity. No registered identity was taken over.
+
+A real Render **Restart service** action started a new process at 20:29:07 MYT, ready at 20:29:32. [Before/after API evidence](../../tests/evidence/restorecart-hosted-storage.json) verifies the same authenticated session, controlled account and controlled paid-order record before restart (20:27:58) and after restart (20:30:03). Follow-up direct database checks again verified image bytes, stock movement and duplicate-safe recovery. No new payment-provider call was made.
+
+The previously saved local rehearsal snapshot remains private and unchanged. Accounts created only in the old ephemeral hosted database are not claimed to have been migrated by this local snapshot. The adapter still blocks the server thread during remote SQL and has not been load tested.
+
+To repeat the hosted check, use the private Turso verification fixture/manifest and credentials, run `scripts/restorecart-hosted-storage-check.ts before`, restart the service, wait for a fresh ready log, then run the same script with `after`. The private session/receipt details never enter the public report.
 
 ## Regression and limits
 

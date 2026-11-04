@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-11-04T12:30:03.174Z",
+  "base": "https://restorecart.onrender.com",
+  "before": "2026-11-04T12:27:58.240Z",
+  "after": "2026-11-04T12:30:03.175Z",
+  "checks": {
+    "externalStorage": true,
+    "sameAuthenticatedSession": true,
+    "controlledAccountRetained": true,
+    "controlledPaidOrderRetained": true
+  },
+  "paymentProviderCalls": 0,
+  "scope": "Actual Render restart check using existing controlled payment reference. Complemented by independent Turso image, stock and recovery verification."
+}

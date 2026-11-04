@@ -4,7 +4,7 @@
 
 The local rehearsal snapshot was migrated to actual Turso/libSQL without changing the source. All 24 original rows across 16 tables were compared unchanged. Separate application processes retained accounts, example image bytes, controlled payment references, stock movements and recovery journals. Repeated recovery applied zero additional changes. Local development now requires this external database. These controlled payment records are not new PayPal transactions. [Evidence and scope](BACKEND_VERIFICATION_2026_11.md).
 
-Render activation/restart verification is a separate deployment check and must not be inferred from these database tests.
+Actual Render activation and restart verification subsequently passed: the same authenticated session, account and controlled order survived. [Hosted restart evidence](../../tests/evidence/restorecart-hosted-storage.json). The controlled capture reference was not a new PayPal transaction.
 
 ## Current implementation
 
@@ -19,7 +19,7 @@ The official `@libsql/client` runs in a dedicated worker so existing synchronous
 3. Enter the URL and token privately in Render Environment as `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`. Never put the token in chat, GitHub or a `VITE_` variable.
 4. Set `RESTORECART_REQUIRE_PERSISTENCE=true`. Missing external configuration will then stop startup instead of allowing a temporary SQLite deployment.
 5. Rebuild/redeploy only after migration decisions below. No new Render disk is required. Existing accounts do not move merely by setting environment variables.
-6. Check Settings → Data storage. Then verify a seller account, source image, sandbox receipt and recovery record before and after a Render restart. This hosted verification has **not** been performed yet.
+6. Check Settings → Data storage. Then verify a seller account, source image, sandbox receipt and recovery record before and after a Render restart. This was performed on 4 November 2026 for the current hosted deployment using controlled records; repeat it for a new database or service configuration.
 
 ## Preserve an existing local database
 
