@@ -1,5 +1,11 @@
 # Free external storage and recovery verification
 
+## Verified activation — 4 November 2026
+
+The local rehearsal snapshot was migrated to actual Turso/libSQL without changing the source. All 24 original rows across 16 tables were compared unchanged. Separate application processes retained accounts, example image bytes, controlled payment references, stock movements and recovery journals. Repeated recovery applied zero additional changes. Local development now requires this external database. These controlled payment records are not new PayPal transactions. [Evidence and scope](BACKEND_VERIFICATION_2026_11.md).
+
+Render activation/restart verification is a separate deployment check and must not be inferred from these database tests.
+
 ## Current implementation
 
 RestoreCart supports local SQLite for development and a remote Turso/libSQL database for hosted operation. With `TURSO_DATABASE_URL` configured, the app writes accounts, sessions, baskets, catalog/source images, orders, holds, verified payment references, refunds, recovery history, AI caches and encrypted WooCommerce credentials directly to that database. It does not copy an ephemeral file on a timer or fall back to local storage after a failed remote operation.

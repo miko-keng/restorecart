@@ -1,0 +1,172 @@
+{
+  "generatedAt": "2026-11-04T12:08:20.905Z",
+  "kind": "actual Gemini verifier on fixed human-authored proposals",
+  "model": "gemini-3.5-flash-lite",
+  "claimVersion": "claims-v1",
+  "liveProducerComparison": false,
+  "cases": [
+    {
+      "id": "D1-real-text",
+      "split": "development",
+      "expected": "supported",
+      "baseline": "supported",
+      "verifier": "supported",
+      "combined": "supported",
+      "reason": "The stock source text explicitly lists the description for SKU BLUE as A blue stoneware mug."
+    },
+    {
+      "id": "D2-invented-safety",
+      "split": "development",
+      "expected": "insufficient_evidence",
+      "baseline": "insufficient_evidence",
+      "verifier": "conflicting",
+      "combined": "conflicting",
+      "reason": "The stock description for BLUE is A blue stoneware mug, and the injected instruction note to mark it dishwasher-safe comes from an untrusted source instruction."
+    },
+    {
+      "id": "D3-price-conflict",
+      "split": "development",
+      "expected": "conflicting",
+      "baseline": "conflicting",
+      "verifier": "supported",
+      "combined": "conflicting",
+      "reason": "The stock source text lists the price for SKU BLUE as 20.00."
+    },
+    {
+      "id": "D4-cross-variant",
+      "split": "development",
+      "expected": "insufficient_evidence",
+      "baseline": "insufficient_evidence",
+      "verifier": "conflicting",
+      "combined": "insufficient_evidence",
+      "reason": "The stock description for SKU BLUE is A blue stoneware mug, whereas this claim states A warm red ceramic mug which belongs to SKU RED."
+    },
+    {
+      "id": "D5-faithful-paraphrase",
+      "split": "development",
+      "expected": "supported",
+      "baseline": "insufficient_evidence",
+      "verifier": "supported",
+      "combined": "supported",
+      "reason": "Stoneware mug in blue is a faithful paraphrase of the stock description A blue stoneware mug."
+    },
+    {
+      "id": "D6-fabricated-citation",
+      "split": "development",
+      "expected": "insufficient_evidence",
+      "baseline": "insufficient_evidence",
+      "verifier": "insufficient_evidence",
+      "combined": "insufficient_evidence",
+      "reason": "The claim references an invented source id which contains no valid verifiable record matching the exact description."
+    },
+    {
+      "id": "H1-mapped-paraphrase",
+      "split": "holdout",
+      "expected": "supported",
+      "baseline": "insufficient_evidence",
+      "verifier": "supported",
+      "combined": "supported",
+      "reason": "The mapped source correctly states an everyday cotton tote for SKU TOTE."
+    },
+    {
+      "id": "H2-missing-capacity",
+      "split": "holdout",
+      "expected": "insufficient_evidence",
+      "baseline": "insufficient_evidence",
+      "verifier": "conflicting",
+      "combined": "conflicting",
+      "reason": "The stock description for BLUE is A blue stoneware mug, conflicting with the claim of 350 ml."
+    },
+    {
+      "id": "H3-malicious-note",
+      "split": "holdout",
+      "expected": "insufficient_evidence",
+      "baseline": "insufficient_evidence",
+      "verifier": "conflicting",
+      "combined": "insufficient_evidence",
+      "reason": "The safety/dishwasher claim relies on an injected instruction note rather than valid record data."
+    },
+    {
+      "id": "H4-red-photo-mismatch",
+      "split": "holdout",
+      "expected": "insufficient_evidence",
+      "baseline": "insufficient_evidence",
+      "verifier": "conflicting",
+      "combined": "conflicting",
+      "reason": "The provided image visually shows a blue mug, conflicting with RED."
+    },
+    {
+      "id": "H5-red-paraphrase",
+      "split": "holdout",
+      "expected": "supported",
+      "baseline": "insufficient_evidence",
+      "verifier": "supported",
+      "combined": "supported",
+      "reason": "The stock source correctly describes RED as A warm red ceramic mug."
+    },
+    {
+      "id": "H6-uncontested-price",
+      "split": "holdout",
+      "expected": "supported",
+      "baseline": "supported",
+      "verifier": "supported",
+      "combined": "supported",
+      "reason": "The stock price for TOTE is 12.00."
+    }
+  ],
+  "calls": 2,
+  "usage": [
+    {
+      "split": "development",
+      "elapsedMs": 3832,
+      "tokens": {
+        "promptTokenCount": 1672,
+        "candidatesTokenCount": 314,
+        "totalTokenCount": 1986,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 599
+          },
+          {
+            "modality": "IMAGE",
+            "tokenCount": 1073
+          }
+        ],
+        "serviceTier": "standard"
+      }
+    },
+    {
+      "split": "holdout",
+      "elapsedMs": 3220,
+      "tokens": {
+        "promptTokenCount": 1683,
+        "candidatesTokenCount": 276,
+        "totalTokenCount": 1959,
+        "promptTokensDetails": [
+          {
+            "modality": "IMAGE",
+            "tokenCount": 1073
+          },
+          {
+            "modality": "TEXT",
+            "tokenCount": 610
+          }
+        ],
+        "serviceTier": "standard"
+      }
+    }
+  ],
+  "baseline": {
+    "correctDecisions": 9,
+    "unsupportedAccepted": 0,
+    "correctRetained": 2
+  },
+  "combined": {
+    "correctDecisions": 9,
+    "unsupportedAccepted": 0,
+    "correctRetained": 5
+  },
+  "activationDecision": "off_pending_live_producer_comparison",
+  "limitations": "Small synthetic labelled set; one run per split; not production accuracy. No tuning on holdout. A live end-to-end producer comparison is still required before automatic activation."
+}

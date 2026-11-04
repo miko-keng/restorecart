@@ -79,7 +79,7 @@ export async function reconstruct(
       quotaOwner(db, id),
       sources.map((s) => [s.id, s.hash, s.columnMapping, s.observedAt]),
       instruction,
-      "schema-v1",
+      "schema-v2-claim-validation",
       model,
       mode,
     ]),

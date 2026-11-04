@@ -1,0 +1,10 @@
+{
+  "generatedAt": "2026-11-04T12:19:47.291Z",
+  "source": "Private consistent rehearsal snapshot",
+  "destination": "Actual remote Turso/libSQL",
+  "sourceTables": 16,
+  "originalRowsCompared": 24,
+  "allOriginalRowsUnchanged": true,
+  "sourceOverwritten": false,
+  "extraRecords": "Separate controlled verification fixtures and seeded sample shop"
+}

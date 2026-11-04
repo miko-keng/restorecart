@@ -59,10 +59,14 @@ workerData.port.on("message", (message) => {
       }
       workerData.port.postMessage({ result });
       Atomics.store(state, 0, 1);
-    } catch {
+    } catch (error) {
+      // Emit only a bounded provider code, never SQL, parameters, tokens or URLs.
+      const code =
+        typeof error?.code === "string" && /^[A-Z0-9_]{1,64}$/.test(error.code)
+          ? error.code
+          : "UNKNOWN";
       workerData.port.postMessage({
-        error:
-          "External database operation failed. Check database availability; do not repeat uncertain payments or recovery writes blindly.",
+        error: `External database operation failed (${code}). Check database availability; do not repeat uncertain payments or recovery writes blindly.`,
       });
       Atomics.store(state, 0, 2);
     }

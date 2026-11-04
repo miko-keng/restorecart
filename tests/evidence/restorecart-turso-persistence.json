@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-11-04T12:14:40.042Z",
+  "backend": "actual remote Turso/libSQL",
+  "applicationProcesses": 2,
+  "checks": {
+    "accountRetained": true,
+    "imageBytesRetained": true,
+    "controlledCaptureRetained": true,
+    "stockMovesRetained": true,
+    "recoveryJournalRetained": true,
+    "repeatRecoveryChanges": 0,
+    "stockMovesForOrder": 1,
+    "failedTransactionRolledBack": true
+  },
+  "paymentProviderCalls": 0,
+  "scope": "Independent local application processes against hosted Turso. Controlled payment reference; no PayPal purchase. This is not a Render service restart test."
+}

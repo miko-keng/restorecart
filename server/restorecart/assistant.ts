@@ -1,3 +1,9 @@
+import { assessClaims, CLAIM_VERSION } from "./claims";
+import {
+  verifyClaims,
+  mergeVerification,
+  VERIFIER_VERSION,
+} from "./claimVerifier";
 import { rememberReview, reviewFingerprint } from "./reviewRecord";
 import { z } from "zod";
 import { config, claimGeminiCall } from "./reconstruction";
@@ -47,6 +53,13 @@ export async function assist(
   transport: typeof fetch = fetch,
   fresh = false,
 ) {
+  const startedAt = Date.now();
+  const verifierMode =
+    process.env.RESTORECART_AI_VERIFIER === "enforce"
+      ? "enforce"
+      : process.env.RESTORECART_AI_VERIFIER === "shadow"
+        ? "shadow"
+        : "off";
   const shop = incident(db, id),
     sources = sourceList(db, id);
   const payment = kind === "payment" ? order(db, orderId || "") : null;
@@ -92,7 +105,10 @@ export async function assist(
   const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const key = hash(
     JSON.stringify([
-      "seller-assist-v2",
+      "seller-assist-v3",
+      CLAIM_VERSION,
+      VERIFIER_VERSION,
+      verifierMode,
       id,
       orderId,
       kind,
@@ -251,41 +267,93 @@ export async function assist(
     }
   }
   if (kind === "review") {
+    // Server evidence checks cannot be overridden by a second model.
+    let findings = assessClaims(result.suggestions, shop.products, sources);
+    if (live && verifierMode !== "off" && result.suggestions.length) {
+      try {
+        if (config().ai.maxCallsPerRun < 2)
+          throw Error(
+            "Combined review call budget does not permit a verifier.",
+          );
+        claimGeminiCall(db, id);
+        const images = sources
+          .filter((s) => /^image\/(png|jpeg)$/.test(s.mime))
+          .slice(0, 4)
+          .flatMap((s) => [
+            { text: `Image source ${s.id}: ${s.name}` },
+            {
+              inlineData: {
+                mimeType: s.mime,
+                data: Buffer.from(
+                  (
+                    db
+                      .prepare(
+                        "SELECT bytes FROM rc_sources WHERE id=? AND incident=?",
+                      )
+                      .get(s.id, id) as any
+                  ).bytes,
+                ).toString("base64"),
+              },
+            },
+          ]);
+        const checked = await verifyClaims({
+          claims: result.suggestions,
+          products: shop.products,
+          sources: sources.map((s) => ({
+            id: s.id,
+            mime: s.mime,
+            text: s.text.slice(0, 18000),
+            columnMapping: s.columnMapping,
+          })),
+          images,
+          model,
+          key: process.env.GEMINI_API_KEY || "injected-test-transport",
+          transport,
+          timeoutMs: Math.max(
+            1,
+            Math.min(35000, 85000 - (Date.now() - startedAt)),
+          ),
+        });
+        result.verification = { ...checked, mode: verifierMode };
+        if (verifierMode === "enforce")
+          findings = mergeVerification(findings, checked.findings);
+      } catch {
+        // Fail closed to deterministic checks; never turn a verifier outage into approval.
+        result.verification = {
+          mode: verifierMode,
+          status: "unavailable",
+          version: VERIFIER_VERSION,
+        };
+      }
+    }
+    result.claimValidation = { version: CLAIM_VERSION, findings };
     const omitted: any[] = [];
-    result.suggestions = result.suggestions.filter((suggestion: any) => {
-      const p = shop.products.find((p) => p.sku === suggestion.sku),
-        source = sources.find((s) => s.id === suggestion.sourceId);
-      let valid = !!p && !!source;
-      if (valid && suggestion.field === "price") {
-        const evidence = p!.candidates.find(
-          (e) =>
-            e.field === "price" &&
-            e.value === suggestion.value &&
-            e.sourceId === source.id,
-        );
-        valid = !!evidence;
-        if (evidence) suggestion.excerpt = evidence.excerpt;
-      }
-      if (valid && suggestion.field === "imageSourceId")
-        valid =
-          suggestion.value === source.id && source.mime.startsWith("image/");
-      if (valid && ["name", "description"].includes(suggestion.field)) {
-        if (
-          suggestion.excerpt.trim() &&
-          source.text.includes(suggestion.excerpt)
-        )
-          valid = true;
-        else if (
-          suggestion.value.trim() &&
-          source.text.includes(suggestion.value)
-        ) {
-          suggestion.excerpt = suggestion.value;
-          valid = true;
-        } else valid = false;
-      }
-      if (!valid) omitted.push(suggestion);
-      return valid;
-    });
+    result.suggestions = result.suggestions.filter(
+      (suggestion: any, index: number) => {
+        const finding = findings[index];
+        suggestion.evidenceStatus = finding.status;
+        suggestion.applicable = finding.status === "supported";
+        if (suggestion.field === "price") {
+          const product = shop.products.find((p) => p.sku === suggestion.sku);
+          const evidence = product?.candidates.find(
+            (e) =>
+              e.field === "price" &&
+              e.sourceId === suggestion.sourceId &&
+              Number(e.value) === Number(suggestion.value),
+          );
+          if (evidence) suggestion.excerpt = evidence.excerpt;
+        }
+        if (finding.status !== "supported") {
+          omitted.push({ ...suggestion, finding });
+          // Show conflicts and photo uncertainty through the existing field-level UI.
+          return (
+            finding.status === "conflicting" ||
+            (suggestion.field === "imageSourceId" && !finding.hardBlock)
+          );
+        }
+        return true;
+      },
+    );
     result.questions = result.questions.filter((q: any) =>
       shop.products.some((p) => p.sku === q.sku),
     );
@@ -296,12 +364,27 @@ export async function assist(
       )
         result.questions.push({
           sku: s.sku,
-          text: "Confirm this product from the original records; an AI suggestion could not be verified.",
+          text: `${s.field}: ${s.finding.reason}`,
         });
-    if (omitted.length)
+    if (
+      omitted.some(
+        (s) =>
+          (s.finding.hardBlock && s.finding.status !== "conflicting") ||
+          (s.field !== "imageSourceId" && s.finding.status !== "conflicting"),
+      )
+    )
       result.summary =
         "Some AI suggestions could not be verified and were withheld. Review the source questions below.";
-    result.omittedSuggestions = omitted.length;
+    result.omittedSuggestions = omitted.filter(
+      (s) =>
+        (s.finding.hardBlock && s.finding.status !== "conflicting") ||
+        (s.field !== "imageSourceId" && s.finding.status !== "conflicting"),
+    ).length;
+    if (incident(db, id).revision !== shop.revision)
+      fail(
+        "Your draft changed during AI review. Run review again against the saved draft.",
+        409,
+      );
   } else if (
     facts!.state !== "paid" &&
     /\b(?:order|payment) (?:is|was|has been) (?:paid|completed|captured)\b/i.test(

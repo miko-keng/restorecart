@@ -6,7 +6,7 @@ RestoreCart reconstructs a catalog from surviving records, opens a temporary pic
 
 ## Reviewer guide: resettable sandbox demo and test evidence
 
-**This submission is a sandbox prototype. The default Render Free deployment uses temporary local SQLite; persistent external storage is implemented but is not configured or hosted-restart verified.** New accounts, uploads, baskets, sandbox orders and recovery progress may be lost when the service spins down, restarts or redeploys. The application is not presented as a durable production order system.
+**This submission is a sandbox prototype. The default Render Free deployment uses temporary local SQLite; Turso persistence is now configured locally and verified across application processes. Render activation/restart verification is tracked separately in the backend report.** New accounts, uploads, baskets, sandbox orders and recovery progress may be lost when the service spins down, restarts or redeploys. The application is not presented as a durable production order system.
 
 | What a reviewer sees | Where it comes from | What a reset means |
 | --- | --- | --- |
@@ -19,13 +19,13 @@ Pushing this repository to GitHub preserves source code and sample fixtures, **n
 
 ### Evidence and how to reproduce it
 
-- **Current automated verification:** 153 tests passed on 3 November 2026; production build passed. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current verification and limitations](docs/restorecart/PAYPAL_SELLER_CONNECTION.md).
+- **Current automated verification:** 164 tests passed on 4 November 2026; production build passed. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current backend verification and measured AI results](docs/restorecart/BACKEND_VERIFICATION_2026_11.md).
 - **Historical real sandbox E2E:** the documented local run used live Gemini and a $52 PayPal sandbox capture, followed by fulfillment, backup restoration and duplicate-safe local recovery. The historical 84-test count belongs to that earlier run. [Recorded E2E report](docs/restorecart/FINAL_E2E_REPORT.md).
 - **Local demonstration:** follow the [input/button rehearsal guide](DEMO_REHEARSAL_GUIDE.md) to show actual sandbox checkout, Orders, pickup tracking and recovery in one running session. Clearly identify Sample preview and saved Gemini replay. An edited demonstration should not imply simulated examples are actual payments.
 - **Submission video:** final public video link is pending. The recording should show the local flow and disclose that the free hosted demo may reset. No claim is made here that an unlinked video has already been reviewed.
 - **Current hosted verification:** implementation commit `85c9474` was deployed on 31 October 2026 and completed a real $52 PayPal sandbox capture, seller fulfillment, buyer pickup tracking and local-file recovery with zero repeat changes. [Hosted release report](docs/restorecart/HOSTED_RELEASE_REPORT.md). Webhook delivery was not independently observed in that journey; it used the verified server payment flow. A configuration redeploy also demonstrated loss of temporary app records, so no persistence claim is made.
 
-WooCommerce is an optional seller-configured connector. Automated contract tests exist; real-store verification is pending. It is not required to run the supported local Original Store JSON v1 recovery demonstration. External Turso/libSQL storage can be configured later using the [setup and migration guide](docs/restorecart/EXTERNAL_STORAGE.md).
+WooCommerce is an optional seller-configured connector. Automated contract tests exist; real-store verification is pending. It is not required to run the supported local Original Store JSON v1 recovery demonstration. Local Turso/libSQL persistence has been activated and verified using the [setup and migration guide](docs/restorecart/EXTERNAL_STORAGE.md).
 
 ## Latest approved improvements
 
@@ -35,11 +35,17 @@ When deployed, the latest code recreates a labelled published **Sunday Studio Sa
 
 Saved Sunday Studio Gemini review can now be replayed with **zero API calls**, labelled with its original date. Order-status samples follow the selected filter. [Replay provenance and verification](docs/restorecart/SAVED_GEMINI_REVIEW.md).
 
+## Evidence verification and persistent storage
+
+The backend now checks claims against the correct SKU record, withholds unsupported descriptions and photo certainty, preserves blocked decisions during saved replay, and rejects cross-variant spreadsheet values. A separately instructed Gemini checker has been evaluated on actual API calls; it remains **off by default** because the live producer comparison did not demonstrate an additional error caught. Server checks stay active with no extra AI call. [Measured comparison, safeguards, setup and limitations](docs/restorecart/BACKEND_VERIFICATION_2026_11.md).
+
+The existing local rehearsal data was preserved and migrated to Turso: all 24 original rows across 16 tables were compared unchanged. Separate application processes retained controlled order records, account/image data and recovery history; repeated recovery applied zero new changes. These are actual remote-database checks using controlled payment references. [Persistence evidence](tests/evidence/restorecart-turso-persistence.json).
+
 ## Seller PayPal connection
 
 Open **Seller Settings → Connections → PayPal payments → Connect PayPal**. The seller signs in on PayPal and grants payment/refund permission; RestoreCart verifies the merchant and permissions server-side before enabling seller checkout. Orders retain their original merchant for capture and refund even if the shop later disconnects. No seller PayPal password or API secret is entered into RestoreCart.
 
-**Activation is pending:** the current local configuration has single-merchant checkout credentials, but no platform merchant ID or attribution ID. The panel displays Not connected and explains that setup is unavailable. Configure a sandbox **Platform REST app** with Partner Referrals access to activate it. Sandbox testing can precede live partner approval; this app remains sandbox-only. [Setup, security checks and current verification](docs/restorecart/PAYPAL_SELLER_CONNECTION.md).
+**Configuration:** the demonstration uses single-merchant checkout credentials. Separate private sandbox Platform verification settings have passed app authentication and an initial partner lookup; deployment-specific configuration determines whether seller connections are available. Use a sandbox **Platform REST app** with Partner Referrals access for seller onboarding. Sandbox testing can precede live partner approval; this app remains sandbox-only. [Setup, security checks and current verification](docs/restorecart/PAYPAL_SELLER_CONNECTION.md).
 
 The existing single-account demo remains available when platform configuration is entirely absent; it is explicitly labelled as using a shared sandbox account. Valid platform configuration, strict mode, or any saved shop connection prevents an unconnected shop from silently falling back to that account. Historical shared-account orders are not migrated to another merchant by connecting a seller.
 
@@ -58,7 +64,7 @@ The schedule supports one counter and one opening window per date, in a fixed sh
 
 Decision history is append-only through the application and shows the latest 100 entries for a product. It shares the database's retention limits: temporary hosted storage can lose history on restart. It is not a tamper-proof external audit service.
 
-Run `npm test` for the full suite, `npm run test:ai-evals` for six focused AI validation scenarios, and `npm run build` for production checks. AI evaluations use controlled responses to test conflict handling, missing information, ambiguous photos, invented citations and document prompt injection. They do not measure fresh Gemini model accuracy and make no model API calls. [Results, browser evidence and limitations](docs/restorecart/PRIORITIES_12367_REPORT.md).
+Run `npm test` for the full suite, `npm run test:ai-evals` for six focused AI validation scenarios, and `npm run build` for production checks. The six routine AI evaluations use controlled responses to test conflict handling, missing information, ambiguous photos, invented citations and document prompt injection. Separate opt-in live Gemini comparisons and measured results are documented in the backend verification report; routine tests make no model API calls. [Results, browser evidence and limitations](docs/restorecart/PRIORITIES_12367_REPORT.md).
 
 ## Architecture
 

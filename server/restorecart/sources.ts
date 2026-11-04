@@ -1,3 +1,4 @@
+import { assessClaims } from "./claims";
 import Papa from "papaparse";
 import { PDFParse } from "pdf-parse";
 import { imageSize } from "image-size";
@@ -277,6 +278,25 @@ export function checkEvidence(products: unknown[], sources: any[]) {
       if (!source) fail("AI cited an unknown source.");
       if (!e.location.trim() || !e.excerpt.trim())
         fail("AI evidence needs a location and excerpt.");
+      if (source.mime === "text/csv") {
+        const ownRows = csvCandidates(source).filter(
+          (row: any) => row.sku === p.sku,
+        ) as any[];
+        if (
+          !ownRows.some((row) =>
+            row.candidates.some(
+              (actual: any) =>
+                actual.field === e.field &&
+                (["price", "stock"].includes(e.field)
+                  ? Number(actual.value) === Number(e.value)
+                  : actual.value === e.value),
+            ),
+          )
+        )
+          fail(
+            "AI field is not supported by the matching spreadsheet SKU row.",
+          );
+      }
       if (source.text) {
         const compact = (s: string) => s.replace(/\s+/g, " ").trim();
         const quoted = compact(e.excerpt);
@@ -290,6 +310,13 @@ export function checkEvidence(products: unknown[], sources: any[]) {
         if (!text.includes(quoted) && !csv.some((s) => s.includes(quoted)))
           fail("AI excerpt does not appear in the uploaded source.");
         if (
+          e.field === "name" &&
+          !compact(e.excerpt)
+            .toLowerCase()
+            .includes(compact(e.value).toLowerCase())
+        )
+          fail("AI product name is not supported by its excerpt.");
+        if (
           e.field === "price" &&
           (!/^\d+(?:\.\d{1,2})?$/.test(e.value) ||
             ![
@@ -299,6 +326,37 @@ export function checkEvidence(products: unknown[], sources: any[]) {
           fail("AI price is not supported by its excerpt.");
       }
     }
+    // A real citation does not justify unrelated descriptive attributes.
+    if (
+      p.description &&
+      !sources.some((source) => {
+        const excerpt =
+          source.mime === "text/csv"
+            ? p.description
+            : (source.text || "")
+                .split(/\r?\n/)
+                .find(
+                  (line: string) =>
+                    line.includes(p.sku) && line.includes(p.description),
+                ) || "";
+        return (
+          assessClaims(
+            [
+              {
+                sku: p.sku,
+                field: "description",
+                value: p.description,
+                sourceId: source.id,
+                excerpt,
+              },
+            ],
+            [p],
+            sources,
+          )[0].status === "supported"
+        );
+      })
+    )
+      p.description = "";
     return p;
   });
 }

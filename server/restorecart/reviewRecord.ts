@@ -99,7 +99,10 @@ export function readSavedReview(db: DB, id: string) {
             ? sourceFor(s.value).current?.id || ""
             : s.value,
         applicable:
-          !stale && !!ref.current && shop.products.some((p) => p.sku === s.sku),
+          s.applicable !== false &&
+          !stale &&
+          !!ref.current &&
+          shop.products.some((p) => p.sku === s.sku),
       };
     }),
     questions: envelope.answer.questions.map((q: any) => {

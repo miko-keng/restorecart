@@ -26,6 +26,17 @@ export function seedConfiguredAccount(db: DB, email: string, password: string) {
   const old = db
     .prepare("SELECT * FROM rc_accounts WHERE id=?")
     .get(BOOTSTRAP) as any;
+  const occupied = db
+    .prepare("SELECT id FROM rc_accounts WHERE email=? AND id<>?")
+    .get(email.toLowerCase(), BOOTSTRAP);
+  if (occupied) {
+    // A migrated or registered seller owns this address. Environment bootstrap
+    // must never overwrite their password, role, identity or shop ownership.
+    if (old) return;
+    throw Error(
+      "The configured seller email is already registered. Existing accounts were preserved; choose a distinct bootstrap email.",
+    );
+  }
   if (
     old &&
     old.email === email.toLowerCase() &&

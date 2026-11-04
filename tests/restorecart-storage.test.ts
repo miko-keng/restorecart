@@ -211,3 +211,63 @@ test("Migration copies operational tables and blobs, preserves the source and re
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("Migrated registered seller email does not collide with or overwrite bootstrap credentials", async () => {
+  const { seedConfiguredAccount } =
+    await import("../server/restorecart/accounts");
+  const db = openRC(":memory:");
+  try {
+    accountTables(db);
+    seedConfiguredAccount(
+      db,
+      "original-bootstrap@restorecart.test",
+      "OriginalBootstrap2026!",
+    );
+    registerAccount(db, {
+      username: "registered-seller",
+      email: "seller.demo@restorecart.test",
+      password: "RegisteredSeller2026!",
+      role: "seller",
+    });
+    const before = db.prepare("SELECT * FROM rc_accounts ORDER BY id").all();
+    seedConfiguredAccount(
+      db,
+      "seller.demo@restorecart.test",
+      "DifferentEnvironmentPassword2026!",
+    );
+    assert.deepEqual(
+      db.prepare("SELECT * FROM rc_accounts ORDER BY id").all(),
+      before,
+    );
+  } finally {
+    db.close();
+  }
+});
+
+test("Bootstrap refuses a registered email without taking over an existing account", async () => {
+  const { seedConfiguredAccount } =
+    await import("../server/restorecart/accounts");
+  const db = openRC(":memory:");
+  try {
+    accountTables(db);
+    registerAccount(db, {
+      username: "registered-buyer",
+      email: "registered@restorecart.test",
+      password: "RegisteredBuyer2026!",
+      role: "buyer",
+    });
+    const before = db.prepare("SELECT * FROM rc_accounts").all();
+    assert.throws(
+      () =>
+        seedConfiguredAccount(
+          db,
+          "registered@restorecart.test",
+          "EnvironmentPassword2026!",
+        ),
+      /already registered/,
+    );
+    assert.deepEqual(db.prepare("SELECT * FROM rc_accounts").all(), before);
+  } finally {
+    db.close();
+  }
+});

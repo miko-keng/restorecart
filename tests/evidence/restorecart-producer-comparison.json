@@ -1,0 +1,466 @@
+{
+  "generatedAt": "2026-11-04T12:17:02.725Z",
+  "kind": "actual Gemini review producer and independent checker, same producer output",
+  "calls": [
+    {
+      "status": 200,
+      "elapsedMs": 8313,
+      "usage": {
+        "promptTokenCount": 2542,
+        "candidatesTokenCount": 683,
+        "totalTokenCount": 3225,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 2542
+          }
+        ],
+        "serviceTier": "standard"
+      }
+    },
+    {
+      "status": 200,
+      "elapsedMs": 5958,
+      "usage": {
+        "promptTokenCount": 2934,
+        "candidatesTokenCount": 91,
+        "totalTokenCount": 3025,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 2934
+          }
+        ],
+        "serviceTier": "standard"
+      }
+    }
+  ],
+  "passed": true,
+  "producer": {
+    "summary": "Reviewed catalog products. Identified a price conflict for MUG-BLU between the CSV file ($20.00) and the PDF catalog ($18.00), and submitted a clarification question for the seller. Confirmed pricing and details for MUG-RED and TOTE-NAT.",
+    "suggestions": [
+      {
+        "sku": "MUG-BLU",
+        "field": "name",
+        "value": "Blue mug",
+        "reason": "Verified product name from source record.",
+        "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+        "excerpt": "{\\\"sku\\\":\\\"MUG-BLU\\\",\\\"name\\\":\\\"Blue mug\\\",\\\"price\\\":\\\"20.00\\\",\\\"currency\\\":\\\"USD\\\",\\\"stock\\\":\\\"8\\\",\\\"description\\\":\\\"A blue stoneware mug\\\"}",
+        "evidenceStatus": "supported",
+        "applicable": true
+      },
+      {
+        "sku": "MUG-RED",
+        "field": "name",
+        "value": "Red mug",
+        "reason": "Verified product name from source record.",
+        "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+        "excerpt": "{\\\"sku\\\":\\\"MUG-RED\\\",\\\"name\\\":\\\"Red mug\\\",\\\"price\\\":\\\"18.00\\\",\\\"currency\\\":\\\"USD\\\",\\\"stock\\\":\\\"5\\\",\\\"description\\\":\\\"A warm red stoneware mug\\\"}",
+        "evidenceStatus": "supported",
+        "applicable": true
+      },
+      {
+        "sku": "MUG-RED",
+        "field": "price",
+        "value": "18.00",
+        "reason": "Verified price from source record.",
+        "sourceId": "source_ea4caa69-b720-4dd7-99bb-b4daa3b7ede7",
+        "excerpt": "MUG-RED | Red mug | 18.00 | USD",
+        "evidenceStatus": "supported",
+        "applicable": true
+      },
+      {
+        "sku": "TOTE-NAT",
+        "field": "name",
+        "value": "Natural tote",
+        "reason": "Verified product name from source record.",
+        "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+        "excerpt": "{\\\"sku\\\":\\\"TOTE-NAT\\\",\\\"name\\\":\\\"Natural tote\\\",\\\"price\\\":\\\"12.00\\\",\\\"currency\\\":\\\"USD\\\",\\\"stock\\\":\\\"4\\\",\\\"description\\\":\\\"An everyday cotton tote\\\"}",
+        "evidenceStatus": "supported",
+        "applicable": true
+      },
+      {
+        "sku": "TOTE-NAT",
+        "field": "price",
+        "value": "12.00",
+        "reason": "Verified price from source record.",
+        "sourceId": "source_ea4caa69-b720-4dd7-99bb-b4daa3b7ede7",
+        "excerpt": "TOTE-NAT | Natural tote | 12.00 | USD",
+        "evidenceStatus": "supported",
+        "applicable": true
+      }
+    ],
+    "questions": [
+      {
+        "sku": "MUG-BLU",
+        "text": "There are conflicting prices for the Blue mug (MUG-BLU): $20.00 in the CSV stock file and $18.00 in the PDF catalog. Which price is correct?"
+      }
+    ],
+    "claimValidation": {
+      "version": "claims-v1",
+      "findings": [
+        {
+          "index": 0,
+          "status": "supported",
+          "reason": "Proposed text appears in the matching product record.",
+          "hardBlock": false
+        },
+        {
+          "index": 1,
+          "status": "supported",
+          "reason": "Proposed text appears in the matching product record.",
+          "hardBlock": false
+        },
+        {
+          "index": 2,
+          "status": "supported",
+          "reason": "Price agrees with the recorded candidate.",
+          "hardBlock": false
+        },
+        {
+          "index": 3,
+          "status": "supported",
+          "reason": "Proposed text appears in the matching product record.",
+          "hardBlock": false
+        },
+        {
+          "index": 4,
+          "status": "supported",
+          "reason": "Price agrees with the recorded candidate.",
+          "hardBlock": false
+        }
+      ]
+    },
+    "omittedSuggestions": 0,
+    "source": "gemini",
+    "model": "gemini-3.5-flash-lite",
+    "facts": null,
+    "generatedAt": "2026-11-04T12:17:11.268Z",
+    "inputFingerprint": "3ddd3573ee2bd6761474dc10a7230b477e5b81ee96fa4b1c374acb286adfe9ae",
+    "cached": false
+  },
+  "evidence": {
+    "products": [
+      {
+        "sku": "MUG-BLU",
+        "name": "Blue mug",
+        "description": "A blue stoneware mug",
+        "candidates": [
+          {
+            "field": "name",
+            "value": "Blue mug",
+            "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+            "location": "Row 2",
+            "excerpt": "{\"sku\":\"MUG-BLU\",\"name\":\"Blue mug\",\"price\":\"20.00\",\"currency\":\"USD\",\"stock\":\"8\",\"description\":\"A blue stoneware mug\"}"
+          },
+          {
+            "field": "price",
+            "value": "20.00",
+            "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+            "location": "Row 2",
+            "excerpt": "{\"sku\":\"MUG-BLU\",\"name\":\"Blue mug\",\"price\":\"20.00\",\"currency\":\"USD\",\"stock\":\"8\",\"description\":\"A blue stoneware mug\"}"
+          },
+          {
+            "field": "currency",
+            "value": "USD",
+            "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+            "location": "Row 2",
+            "excerpt": "{\"sku\":\"MUG-BLU\",\"name\":\"Blue mug\",\"price\":\"20.00\",\"currency\":\"USD\",\"stock\":\"8\",\"description\":\"A blue stoneware mug\"}"
+          },
+          {
+            "field": "stock",
+            "value": "8",
+            "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+            "location": "Row 2",
+            "excerpt": "{\"sku\":\"MUG-BLU\",\"name\":\"Blue mug\",\"price\":\"20.00\",\"currency\":\"USD\",\"stock\":\"8\",\"description\":\"A blue stoneware mug\"}"
+          },
+          {
+            "field": "name",
+            "value": "Blue mug",
+            "sourceId": "source_ea4caa69-b720-4dd7-99bb-b4daa3b7ede7",
+            "location": "PDF text line 4",
+            "excerpt": "MUG-BLU | Blue mug | 18.00 | USD"
+          },
+          {
+            "field": "price",
+            "value": "18.00",
+            "sourceId": "source_ea4caa69-b720-4dd7-99bb-b4daa3b7ede7",
+            "location": "PDF text line 4",
+            "excerpt": "MUG-BLU | Blue mug | 18.00 | USD"
+          },
+          {
+            "field": "currency",
+            "value": "USD",
+            "sourceId": "source_ea4caa69-b720-4dd7-99bb-b4daa3b7ede7",
+            "location": "PDF text line 4",
+            "excerpt": "MUG-BLU | Blue mug | 18.00 | USD"
+          }
+        ],
+        "price": "",
+        "currency": "USD",
+        "allocation": 0,
+        "resolved": false,
+        "excluded": false,
+        "resolutionNote": ""
+      },
+      {
+        "sku": "MUG-RED",
+        "name": "Red mug",
+        "description": "A warm red stoneware mug",
+        "candidates": [
+          {
+            "field": "name",
+            "value": "Red mug",
+            "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+            "location": "Row 3",
+            "excerpt": "{\"sku\":\"MUG-RED\",\"name\":\"Red mug\",\"price\":\"18.00\",\"currency\":\"USD\",\"stock\":\"5\",\"description\":\"A warm red stoneware mug\"}"
+          },
+          {
+            "field": "price",
+            "value": "18.00",
+            "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+            "location": "Row 3",
+            "excerpt": "{\"sku\":\"MUG-RED\",\"name\":\"Red mug\",\"price\":\"18.00\",\"currency\":\"USD\",\"stock\":\"5\",\"description\":\"A warm red stoneware mug\"}"
+          },
+          {
+            "field": "currency",
+            "value": "USD",
+            "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+            "location": "Row 3",
+            "excerpt": "{\"sku\":\"MUG-RED\",\"name\":\"Red mug\",\"price\":\"18.00\",\"currency\":\"USD\",\"stock\":\"5\",\"description\":\"A warm red stoneware mug\"}"
+          },
+          {
+            "field": "stock",
+            "value": "5",
+            "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+            "location": "Row 3",
+            "excerpt": "{\"sku\":\"MUG-RED\",\"name\":\"Red mug\",\"price\":\"18.00\",\"currency\":\"USD\",\"stock\":\"5\",\"description\":\"A warm red stoneware mug\"}"
+          },
+          {
+            "field": "name",
+            "value": "Red mug",
+            "sourceId": "source_ea4caa69-b720-4dd7-99bb-b4daa3b7ede7",
+            "location": "PDF text line 5",
+            "excerpt": "MUG-RED | Red mug | 18.00 | USD"
+          },
+          {
+            "field": "price",
+            "value": "18.00",
+            "sourceId": "source_ea4caa69-b720-4dd7-99bb-b4daa3b7ede7",
+            "location": "PDF text line 5",
+            "excerpt": "MUG-RED | Red mug | 18.00 | USD"
+          },
+          {
+            "field": "currency",
+            "value": "USD",
+            "sourceId": "source_ea4caa69-b720-4dd7-99bb-b4daa3b7ede7",
+            "location": "PDF text line 5",
+            "excerpt": "MUG-RED | Red mug | 18.00 | USD"
+          }
+        ],
+        "price": "18.00",
+        "currency": "USD",
+        "allocation": 0,
+        "resolved": false,
+        "excluded": false,
+        "resolutionNote": ""
+      },
+      {
+        "sku": "TOTE-NAT",
+        "name": "Natural tote",
+        "description": "An everyday cotton tote",
+        "candidates": [
+          {
+            "field": "name",
+            "value": "Natural tote",
+            "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+            "location": "Row 4",
+            "excerpt": "{\"sku\":\"TOTE-NAT\",\"name\":\"Natural tote\",\"price\":\"12.00\",\"currency\":\"USD\",\"stock\":\"4\",\"description\":\"An everyday cotton tote\"}"
+          },
+          {
+            "field": "price",
+            "value": "12.00",
+            "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+            "location": "Row 4",
+            "excerpt": "{\"sku\":\"TOTE-NAT\",\"name\":\"Natural tote\",\"price\":\"12.00\",\"currency\":\"USD\",\"stock\":\"4\",\"description\":\"An everyday cotton tote\"}"
+          },
+          {
+            "field": "currency",
+            "value": "USD",
+            "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+            "location": "Row 4",
+            "excerpt": "{\"sku\":\"TOTE-NAT\",\"name\":\"Natural tote\",\"price\":\"12.00\",\"currency\":\"USD\",\"stock\":\"4\",\"description\":\"An everyday cotton tote\"}"
+          },
+          {
+            "field": "stock",
+            "value": "4",
+            "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+            "location": "Row 4",
+            "excerpt": "{\"sku\":\"TOTE-NAT\",\"name\":\"Natural tote\",\"price\":\"12.00\",\"currency\":\"USD\",\"stock\":\"4\",\"description\":\"An everyday cotton tote\"}"
+          },
+          {
+            "field": "name",
+            "value": "Natural tote",
+            "sourceId": "source_ea4caa69-b720-4dd7-99bb-b4daa3b7ede7",
+            "location": "PDF text line 6",
+            "excerpt": "TOTE-NAT | Natural tote | 12.00 | USD"
+          },
+          {
+            "field": "price",
+            "value": "12.00",
+            "sourceId": "source_ea4caa69-b720-4dd7-99bb-b4daa3b7ede7",
+            "location": "PDF text line 6",
+            "excerpt": "TOTE-NAT | Natural tote | 12.00 | USD"
+          },
+          {
+            "field": "currency",
+            "value": "USD",
+            "sourceId": "source_ea4caa69-b720-4dd7-99bb-b4daa3b7ede7",
+            "location": "PDF text line 6",
+            "excerpt": "TOTE-NAT | Natural tote | 12.00 | USD"
+          }
+        ],
+        "price": "12.00",
+        "currency": "USD",
+        "allocation": 0,
+        "resolved": false,
+        "excluded": false,
+        "resolutionNote": ""
+      }
+    ],
+    "sources": [
+      {
+        "id": "source_c3393e90-8647-4a55-a773-528dc1456058",
+        "mime": "text/csv",
+        "text": "sku,name,price,currency,stock,description\nMUG-BLU,Blue mug,20.00,USD,8,A blue stoneware mug\nMUG-RED,Red mug,18.00,USD,5,A warm red stoneware mug\nTOTE-NAT,Natural tote,12.00,USD,4,An everyday cotton tote\n",
+        "columnMapping": null
+      },
+      {
+        "id": "source_ea4caa69-b720-4dd7-99bb-b4daa3b7ede7",
+        "mime": "application/pdf",
+        "text": "Page 1:\nSunday Studio - illustrative sample catalog\nSeller-provided date: 10 October 2026\nMUG-BLU | Blue mug | 18.00 | USD\nMUG-RED | Red mug | 18.00 | USD\nTOTE-NAT | Natural tote | 12.00 | USD",
+        "columnMapping": null
+      }
+    ]
+  },
+  "rawProposals": [
+    {
+      "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+      "reason": "Verified product name from source record.",
+      "sku": "MUG-BLU",
+      "field": "name",
+      "excerpt": "{\\\"sku\\\":\\\"MUG-BLU\\\",\\\"name\\\":\\\"Blue mug\\\",\\\"price\\\":\\\"20.00\\\",\\\"currency\\\":\\\"USD\\\",\\\"stock\\\":\\\"8\\\",\\\"description\\\":\\\"A blue stoneware mug\\\"}",
+      "value": "Blue mug"
+    },
+    {
+      "excerpt": "{\\\"sku\\\":\\\"MUG-RED\\\",\\\"name\\\":\\\"Red mug\\\",\\\"price\\\":\\\"18.00\\\",\\\"currency\\\":\\\"USD\\\",\\\"stock\\\":\\\"5\\\",\\\"description\\\":\\\"A warm red stoneware mug\\\"}",
+      "reason": "Verified product name from source record.",
+      "sku": "MUG-RED",
+      "field": "name",
+      "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+      "value": "Red mug"
+    },
+    {
+      "reason": "Verified price from source record.",
+      "sourceId": "source_ea4caa69-b720-4dd7-99bb-b4daa3b7ede7",
+      "excerpt": "MUG-RED | Red mug | 18.00 | USD",
+      "sku": "MUG-RED",
+      "field": "price",
+      "value": "18.00"
+    },
+    {
+      "sku": "TOTE-NAT",
+      "sourceId": "source_c3393e90-8647-4a55-a773-528dc1456058",
+      "field": "name",
+      "excerpt": "{\\\"sku\\\":\\\"TOTE-NAT\\\",\\\"name\\\":\\\"Natural tote\\\",\\\"price\\\":\\\"12.00\\\",\\\"currency\\\":\\\"USD\\\",\\\"stock\\\":\\\"4\\\",\\\"description\\\":\\\"An everyday cotton tote\\\"}",
+      "value": "Natural tote",
+      "reason": "Verified product name from source record."
+    },
+    {
+      "sourceId": "source_ea4caa69-b720-4dd7-99bb-b4daa3b7ede7",
+      "excerpt": "TOTE-NAT | Natural tote | 12.00 | USD",
+      "reason": "Verified price from source record.",
+      "field": "price",
+      "sku": "TOTE-NAT",
+      "value": "12.00"
+    }
+  ],
+  "checker": {
+    "findings": [
+      {
+        "index": 0,
+        "status": "supported",
+        "reason": "Verified product name from source record."
+      },
+      {
+        "index": 1,
+        "status": "supported",
+        "reason": "Verified product name from source record."
+      },
+      {
+        "index": 2,
+        "status": "supported",
+        "reason": "Verified price from source record."
+      },
+      {
+        "index": 3,
+        "status": "supported",
+        "reason": "Verified product name from source record."
+      },
+      {
+        "index": 4,
+        "status": "supported",
+        "reason": "Verified price from source record."
+      }
+    ],
+    "elapsedMs": 5959,
+    "usage": {
+      "promptTokenCount": 2934,
+      "candidatesTokenCount": 91,
+      "totalTokenCount": 3025,
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 2934
+        }
+      ],
+      "serviceTier": "standard"
+    },
+    "model": "gemini-3.5-flash-lite",
+    "version": "independent-verifier-v1"
+  },
+  "combined": [
+    {
+      "index": 0,
+      "status": "supported",
+      "reason": "Verified product name from source record.",
+      "hardBlock": false
+    },
+    {
+      "index": 1,
+      "status": "supported",
+      "reason": "Verified product name from source record.",
+      "hardBlock": false
+    },
+    {
+      "index": 2,
+      "status": "supported",
+      "reason": "Verified price from source record.",
+      "hardBlock": false
+    },
+    {
+      "index": 3,
+      "status": "supported",
+      "reason": "Verified product name from source record.",
+      "hardBlock": false
+    },
+    {
+      "index": 4,
+      "status": "supported",
+      "reason": "Verified price from source record.",
+      "hardBlock": false
+    }
+  ],
+  "activationDecision": "off: no demonstrated additional unsafe proposal caught on this live producer sample",
+  "limitations": "Single synthetic catalog; not a production accuracy estimate. No seller records, payments or stock modified. Server validation and seller approval remain authoritative."
+}
