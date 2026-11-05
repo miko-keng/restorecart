@@ -674,3 +674,21 @@ section[aria-label="Pickup appointments"] li {
   flex: 0 0 18px;
   margin-top: 0.15rem;
 }
+
+/* Keep order-planning findings readable without changing other notices. */
+.rc .rc-agent-plan {
+  display: block;
+}
+.rc .rc-agent-plan h4 {
+  margin: 0 0 8px;
+}
+.rc .rc-agent-plan ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+}
+.rc .rc-agent-plan li {
+  margin: 8px 0;
+}
+.rc .rc-agent-plan .rc-link {
+  margin-left: 10px;
+}

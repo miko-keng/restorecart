@@ -1,3 +1,6 @@
+import { AGENT_ROLES } from "./agentRuntime";
+import { reconstructWithAgents, agentProgress } from "./agentCoordinator";
+import { planOperations } from "./operationsAgent";
 import {
   mountPayPalConnections,
   paymentDestination,
@@ -396,7 +399,7 @@ export function createApp(
       if (runs.has(id)) fail("Reconstruction is already running.", 409);
       runs.add(id);
       try {
-        await reconstruct(db, id);
+        await reconstructWithAgents(db, id);
         res.json(viewIncident(db, id));
       } finally {
         runs.delete(id);
@@ -669,6 +672,24 @@ export function createApp(
         res.status(202);
       }
       res.json(publicOrder(o));
+    }),
+  );
+  router.get("/incidents/:id/agent-runs", seller, (req, res) => {
+    const id = parseId(req);
+    const runs = (
+      db
+        .prepare(
+          "SELECT value FROM rc_meta WHERE key GLOB 'agent-run:*' AND json_extract(value,'$.shopId')=? ORDER BY rowid DESC LIMIT 20",
+        )
+        .all(id) as any[]
+    ).map((row) => JSON.parse(row.value));
+    res.json({ current: agentProgress(db, id), runs, agents: AGENT_ROLES });
+  });
+  router.post(
+    "/incidents/:id/agent-operations",
+    seller,
+    asyncRoute(async (req, res) => {
+      res.json(await planOperations(db, parseId(req), req.body));
     }),
   );
   router.get("/orders", seller, (req, res) => {

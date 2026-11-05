@@ -2497,3 +2497,55 @@ test("Pickup availability and suggested appointment HTTP flow updates buyer rece
     await f.close();
   }
 });
+
+test("Agent history and operations endpoints enforce seller ownership and CSRF without exposing other shops", async () => {
+  const f = await fixture();
+  try {
+    await prepare(f);
+    const own = await f.seller.request(`/incidents/${f.id}/agent-runs`);
+    assert.equal(own.status, 200);
+    assert.equal(own.data.agents.length, 3);
+    assert.ok(own.data.runs.every((r: any) => r.shopId === f.id));
+    for (const client of [f.buyer, f.stranger]) {
+      assert.equal(
+        (await client.request(`/incidents/${f.id}/agent-runs`)).status,
+        403,
+      );
+      assert.equal(
+        (await client.request(`/incidents/${f.id}/agent-operations`, {}))
+          .status,
+        403,
+      );
+    }
+    assert.equal(
+      (
+        await f.seller.request(
+          `/incidents/${f.id}/agent-operations`,
+          {},
+          "POST",
+          false,
+        )
+      ).status,
+      403,
+    );
+    const before = JSON.stringify(incident(f.db, f.id));
+    const result = await f.seller.request(
+      `/incidents/${f.id}/agent-operations`,
+      {},
+    );
+    assert.equal(result.status, 200);
+    assert.equal(result.data.source, "policy");
+    assert.equal(result.data.actions.length, 0);
+    assert.equal(JSON.stringify(incident(f.db, f.id)), before);
+    assert.equal(
+      (
+        await f.seller.request(`/incidents/${f.id}/agent-operations`, {
+          publish: true,
+        })
+      ).status,
+      400,
+    );
+  } finally {
+    await f.close();
+  }
+});

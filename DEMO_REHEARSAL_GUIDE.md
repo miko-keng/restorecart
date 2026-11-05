@@ -66,3 +66,13 @@ Record the functioning interface and voice in under three minutes, upload public
 ## Submission caption (copy with the actual video link)
 
 RestoreCart helps a merchant reopen from surviving records, resolve an evidence-backed price conflict, take a PayPal sandbox payment, fulfill pickup and return the emergency sale once through the supported local recovery file. The Gemini review in this recording is a genuine saved result. This is a resettable sandbox prototype; WooCommerce is an optional connector awaiting real-store verification.
+
+## Optional order-planning insert (5 November backend update)
+
+The core recorded journey is unchanged. If showing the latest operations controls, use actual sandbox orders in the same running session:
+
+1. Orders → Orders: show **Next action** beside Status. Click **Suggest next actions with Gemini** only if a live request is desired. Say: “Gemini proposes the next step from verified order facts; the seller stays in control.”
+2. Pickup schedule → Pickup opening dates: save a future opening/closing window in the shop timezone.
+3. Click **Suggest pickup plan with Gemini**. Blue **Proposed** events are unsaved. Click **Review appointment**, then **Confirm appointment**. Say: “These times respect existing bookings, and reach the buyer only after confirmation.”
+
+Saved catalog replay does not run the new live roles. Do not claim an earlier video demonstrates a backend check added afterward. Current Render uses temporary SQLite; finish the journey before restart/redeploy. Actual AI checks and controlled tests are linked in the agent report.

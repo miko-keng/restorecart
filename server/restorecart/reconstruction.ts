@@ -1,3 +1,4 @@
+import type { AgentBudget } from "./agentRuntime";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 import {
@@ -58,6 +59,7 @@ export async function reconstruct(
   db: DB,
   id: string,
   transport: typeof fetch = fetch,
+  budget?: AgentBudget,
 ) {
   const i = incident(db, id);
   if (!["draft", "live"].includes(i.state))
@@ -206,6 +208,7 @@ export async function reconstruct(
       toolCount = 0;
     const deadline = Date.now() + Math.min(90000, c.ai.maxRunSeconds * 1000);
     for (let n = 0; n < Math.min(c.ai.maxCallsPerRun, 6) && !proposal; n++) {
+      budget?.claimCall();
       claimGeminiCall(db, id);
       const response = await transport(
         `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
@@ -223,7 +226,11 @@ export async function reconstruct(
             toolConfig: {
               functionCallingConfig: {
                 mode: "ANY",
-                allowedFunctionNames: ["proposeCatalog"],
+                allowedFunctionNames: [
+                  "inspectSources",
+                  "readSourceSection",
+                  "proposeCatalog",
+                ],
               },
             },
             generationConfig: { maxOutputTokens: 8000 },
@@ -246,6 +253,7 @@ export async function reconstruct(
       const replies: any[] = [];
       for (const part of parts) {
         if (!part.functionCall) continue;
+        budget?.claimTool();
         if (++toolCount > Math.min(c.ai.maxToolCallsPerRun, 16))
           fail("Reconstruction reached its tool limit.", 429);
         const { name, args = {} } = part.functionCall;

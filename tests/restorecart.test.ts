@@ -320,7 +320,7 @@ test("RestoreCart Gemini tool contract validates proposals, repairs errors and c
       const body = JSON.parse(String(init?.body));
       assert.deepEqual(
         body.toolConfig.functionCallingConfig.allowedFunctionNames,
-        ["proposeCatalog"],
+        ["inspectSources", "readSourceSection", "proposeCatalog"],
       );
       assert.ok(!JSON.stringify(body.tools).includes("additionalProperties"));
       const rows = structuredClone(products);

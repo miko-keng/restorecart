@@ -1,0 +1,162 @@
+{
+  "generatedAt": "2026-11-05T10:09:17.300Z",
+  "model": "gemini-3.5-flash-lite",
+  "kind": "actual Gemini specialized-agent workflow on synthetic source files and controlled orders",
+  "requests": [
+    {
+      "status": 503,
+      "elapsedMs": 2298,
+      "usage": null
+    },
+    {
+      "status": 200,
+      "elapsedMs": 5726,
+      "usage": {
+        "promptTokenCount": 581,
+        "candidatesTokenCount": 20,
+        "totalTokenCount": 601,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 581
+          }
+        ],
+        "serviceTier": "standard"
+      }
+    },
+    {
+      "status": 200,
+      "elapsedMs": 1739,
+      "usage": {
+        "promptTokenCount": 1971,
+        "candidatesTokenCount": 314,
+        "totalTokenCount": 2285,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 1971
+          }
+        ],
+        "serviceTier": "standard"
+      }
+    },
+    {
+      "status": 200,
+      "elapsedMs": 1431,
+      "usage": {
+        "promptTokenCount": 600,
+        "candidatesTokenCount": 110,
+        "totalTokenCount": 710,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 600
+          }
+        ],
+        "serviceTier": "standard"
+      }
+    },
+    {
+      "status": 503,
+      "elapsedMs": 1582,
+      "usage": null
+    }
+  ],
+  "passed": false,
+  "paymentProviderCalls": 0,
+  "catalogError": "Gemini could not reconstruct this catalog (HTTP 503). Manual editing is still available.",
+  "catalogRun": null,
+  "investigation": {
+    "summary": "Investigated SKU MUG-BLU. Found conflicting prices between sunday-catalog-2026-10-10.pdf ($18.00) and sunday-stock-2026-10-26.csv ($20.00). A description draft is suggested from the CSV record, and a clarifying question has been prepared for the seller regarding the correct price.",
+    "questions": [
+      {
+        "sku": "MUG-BLU",
+        "text": "Which price is correct for Blue mug (MUG-BLU): $18.00 from sunday-catalog-2026-10-10.pdf or $20.00 from sunday-stock-2026-10-26.csv?"
+      }
+    ],
+    "suggestions": [
+      {
+        "sku": "MUG-BLU",
+        "field": "description",
+        "value": "A blue stoneware mug",
+        "reason": "Description provided in sunday-stock-2026-10-26.csv",
+        "sourceId": "source_fc2ac619-872c-45d5-a08c-87f2ef0872f9",
+        "excerpt": "{\"sku\":\"MUG-BLU\",\"name\":\"Blue mug\",\"price\":\"20.00\",\"currency\":\"USD\",\"stock\":\"8\",\"description\":\"A blue stoneware mug\"}",
+        "applicable": true,
+        "evidenceStatus": "supported"
+      }
+    ],
+    "run": {
+      "kind": "review",
+      "fingerprint": "7f00000f457191ca9c8f39c2a88d3f8c14171621c3145db27b6f7e69bcbdf7ba",
+      "state": "awaiting_seller",
+      "steps": [
+        {
+          "role": "conflict_investigator",
+          "model": "gemini-3.5-flash-lite",
+          "trace": [
+            {
+              "kind": "model",
+              "model": "gemini-3.5-flash-lite",
+              "elapsedMs": 5726,
+              "usage": {
+                "promptTokenCount": 581,
+                "candidatesTokenCount": 20,
+                "totalTokenCount": 601,
+                "promptTokensDetails": [
+                  {
+                    "modality": "TEXT",
+                    "tokenCount": 581
+                  }
+                ],
+                "serviceTier": "standard"
+              }
+            },
+            {
+              "kind": "tool",
+              "name": "inspectProductEvidence",
+              "status": "read",
+              "scopeHash": "f1033d859de36a400cfb860264233c27777c708dc7dc847fdc8e8c8e40b246c4"
+            },
+            {
+              "kind": "model",
+              "model": "gemini-3.5-flash-lite",
+              "elapsedMs": 1739,
+              "usage": {
+                "promptTokenCount": 1971,
+                "candidatesTokenCount": 314,
+                "totalTokenCount": 2285,
+                "promptTokensDetails": [
+                  {
+                    "modality": "TEXT",
+                    "tokenCount": 1971
+                  }
+                ],
+                "serviceTier": "standard"
+              }
+            },
+            {
+              "kind": "tool",
+              "name": "submitInvestigation",
+              "status": "proposal"
+            }
+          ],
+          "elapsedMs": 7466,
+          "status": "completed"
+        }
+      ],
+      "calls": 2,
+      "tools": 2,
+      "promptVersion": "rescue-agents-v1",
+      "id": "agent-run_e0257812-f364-4d50-b064-a9cd7279f937",
+      "shopId": "rescue_6cd94cc9-8519-4cc1-a83b-c95f6fc6972e",
+      "version": "rescue-agents-v1",
+      "createdAt": "2026-11-05T10:09:27.333Z",
+      "currentRevision": 2,
+      "stale": false,
+      "ready": 0,
+      "needsInformation": 3
+    }
+  },
+  "error": "Gemini agent unavailable (HTTP 503). Saved work is safe."
+}

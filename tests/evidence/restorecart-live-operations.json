@@ -1,0 +1,195 @@
+{
+  "generatedAt": "2026-11-05T10:11:08.281Z",
+  "model": "gemini-3.5-flash-lite",
+  "kind": "actual Gemini specialized-agent workflow on synthetic source files and controlled orders",
+  "phase": "operations",
+  "requests": [
+    {
+      "status": 200,
+      "elapsedMs": 1983,
+      "usage": {
+        "promptTokenCount": 595,
+        "candidatesTokenCount": 105,
+        "totalTokenCount": 700,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 595
+          }
+        ],
+        "serviceTier": "standard"
+      }
+    },
+    {
+      "status": 200,
+      "elapsedMs": 8162,
+      "usage": {
+        "promptTokenCount": 1195,
+        "candidatesTokenCount": 103,
+        "totalTokenCount": 1298,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 1195
+          }
+        ],
+        "serviceTier": "standard"
+      }
+    }
+  ],
+  "passed": true,
+  "paymentProviderCalls": 0,
+  "operations": {
+    "source": "gemini",
+    "actions": [
+      {
+        "orderId": "order_45c8fb09-28b7-4a4f-ae1a-0affed4562a5",
+        "action": "prepare",
+        "label": "Prepare order",
+        "requiresConfirmation": true,
+        "evidence": {
+          "state": "paid",
+          "captureRecorded": true,
+          "refunded": 0,
+          "fulfillment": "not_ready"
+        }
+      },
+      {
+        "orderId": "order_11963547-298e-48c5-aeb5-f7a1eace3dba",
+        "action": "prepare",
+        "label": "Prepare order",
+        "requiresConfirmation": true,
+        "evidence": {
+          "state": "paid",
+          "captureRecorded": true,
+          "refunded": 0,
+          "fulfillment": "not_ready"
+        }
+      },
+      {
+        "orderId": "order_45c8fb09-28b7-4a4f-ae1a-0affed4562a5",
+        "action": "schedule_pickup",
+        "label": "Schedule pickup",
+        "requiresConfirmation": true,
+        "evidence": {
+          "state": "paid",
+          "captureRecorded": true,
+          "refunded": 0,
+          "fulfillment": "not_ready"
+        }
+      },
+      {
+        "orderId": "order_11963547-298e-48c5-aeb5-f7a1eace3dba",
+        "action": "schedule_pickup",
+        "label": "Schedule pickup",
+        "requiresConfirmation": true,
+        "evidence": {
+          "state": "paid",
+          "captureRecorded": true,
+          "refunded": 0,
+          "fulfillment": "not_ready"
+        }
+      }
+    ],
+    "pickups": [
+      {
+        "orderId": "order_45c8fb09-28b7-4a4f-ae1a-0affed4562a5",
+        "start": "2026-11-06T10:00:00.000Z",
+        "end": "2026-11-06T10:20:00.000Z",
+        "expected": null
+      },
+      {
+        "orderId": "order_11963547-298e-48c5-aeb5-f7a1eace3dba",
+        "start": "2026-11-06T10:20:00.000Z",
+        "end": "2026-11-06T10:40:00.000Z",
+        "expected": null
+      }
+    ],
+    "run": {
+      "kind": "operations",
+      "fingerprint": "49bda58fe437d42dbacfa85f6bdfe15f50de4f6435bbc08b881aa74f837f4150",
+      "state": "awaiting_seller_confirmation",
+      "steps": [
+        {
+          "role": "operations",
+          "source": "gemini",
+          "model": "gemini-3.5-flash-lite",
+          "trace": [
+            {
+              "kind": "model",
+              "model": "gemini-3.5-flash-lite",
+              "elapsedMs": 1984,
+              "usage": {
+                "promptTokenCount": 595,
+                "candidatesTokenCount": 105,
+                "totalTokenCount": 700,
+                "promptTokensDetails": [
+                  {
+                    "modality": "TEXT",
+                    "tokenCount": 595
+                  }
+                ],
+                "serviceTier": "standard"
+              }
+            },
+            {
+              "kind": "tool",
+              "name": "inspectOrderFacts",
+              "status": "read",
+              "scopeHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+            },
+            {
+              "kind": "tool",
+              "name": "inspectPickupAvailability",
+              "status": "read",
+              "scopeHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+            },
+            {
+              "kind": "tool",
+              "name": "findPickupSlots",
+              "status": "read",
+              "scopeHash": "edea7df82b423d2f0bdc252350e4620b878f86223d16b85d11454a109c0f1f2a"
+            },
+            {
+              "kind": "model",
+              "model": "gemini-3.5-flash-lite",
+              "elapsedMs": 8162,
+              "usage": {
+                "promptTokenCount": 1195,
+                "candidatesTokenCount": 103,
+                "totalTokenCount": 1298,
+                "promptTokensDetails": [
+                  {
+                    "modality": "TEXT",
+                    "tokenCount": 1195
+                  }
+                ],
+                "serviceTier": "standard"
+              }
+            },
+            {
+              "kind": "tool",
+              "name": "proposeOperations",
+              "status": "proposal"
+            }
+          ],
+          "status": "proposed"
+        }
+      ],
+      "calls": 2,
+      "tools": 4,
+      "rejectedProposals": 0,
+      "id": "agent-run_ebc357df-ee6d-4692-bbf8-0ff923f182e9",
+      "shopId": "rescue_f789ac5c-75ba-44e5-a7ec-607fe706ceeb",
+      "version": "rescue-agents-v1",
+      "createdAt": "2026-11-05T10:11:18.668Z",
+      "currentRevision": 1,
+      "scope": "Operational suggestions require current server checks at confirmation."
+    }
+  },
+  "checks": {
+    "nonOverlappingPickupProposals": true,
+    "noOrderMutations": true,
+    "noAppointmentsSaved": true
+  }
+}

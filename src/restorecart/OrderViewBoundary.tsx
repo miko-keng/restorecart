@@ -10,9 +10,12 @@ export class OrderViewBoundary extends Component<
   render() {
     return this.state.failed ? (
       <p role="alert">
-        This order view could not load.{" "}
+        The order view could not load. A deployment may have updated its files.{" "}
         <button type="button" onClick={this.props.onFallback}>
           Show order details
+        </button>{" "}
+        <button type="button" onClick={() => window.location.reload()}>
+          Reload workspace
         </button>
       </p>
     ) : (

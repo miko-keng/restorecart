@@ -421,12 +421,11 @@ export function mountContinuity(router: any, db: DB, seller: any, wrap: any) {
       .object({ fresh: z.boolean().optional() })
       .strict()
       .parse(req.body);
+    const { reviewWithAgents } = await import("./agentCoordinator");
     res.json(
-      await assist(
+      await reviewWithAgents(
         db,
         String(req.params.id),
-        "review",
-        undefined,
         fetch,
         b.fresh || false,
       ),
@@ -440,7 +439,7 @@ export function mountContinuity(router: any, db: DB, seller: any, wrap: any) {
     const sku = z.string().min(1).max(80).parse(req.query.sku);
     res.json(decisionHistory(db, String(req.params.id), sku));
   });
-  post("/incidents/:id/editor-product", (req: any, res: any) => {
+  post("/incidents/:id/editor-product", async (req: any, res: any) => {
     const id = String(req.params.id),
       b = z
         .object({
@@ -559,6 +558,8 @@ export function mountContinuity(router: any, db: DB, seller: any, wrap: any) {
       i.revision++;
       save(db, i);
     });
+    const { resumeAfterSellerEdit } = await import("./agentCoordinator");
+    resumeAfterSellerEdit(db, id);
     res.json(viewIncident(db, id));
   });
   get("/incidents/:id/readiness", (req: any, res: any) =>

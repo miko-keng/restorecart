@@ -17,3 +17,7 @@ The original setup note says evaluation/deployment coverage still requires confi
 References:
 - https://bryntum.com/products/schedulerpro/docs/guide/SchedulerPro/quick-start/react
 - https://bryntum.com/products/license/
+
+## Proposed appointments
+
+The Operations Agent can propose unsaved appointments after server availability checks. Blue events named **Proposed** open a review; **Confirm appointment** performs the existing guarded save. Proposed events cannot be dragged. Actual appointment moves still require confirmation, and a plain list remains usable without the trial timeline. See [the implementation report](AGENT_IMPLEMENTATION_REPORT.md) for controlled and actual-model evidence.

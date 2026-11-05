@@ -1,3 +1,9 @@
+# Latest implementation status — 5 November 2026
+
+The three specialized Gemini roles, bounded tool calls, AG Grid next actions and Bryntum confirmed proposals are implemented. Current verification and limitations: [agent report](AGENT_IMPLEMENTATION_REPORT.md). Current hosting is temporary SQLite at the user's request; older Turso evidence below is historical. All 178 automated tests and the production build passed. The full live provider run encountered intermittent 503 responses; independent investigator and operations calls succeeded. No new PayPal capture was performed in this update.
+
+---
+
 ## Seller PayPal connection update — 3 November 2026
 
 **153 automated tests and production build pass locally.** Connect PayPal UI and server authorization flow are implemented; actual platform sandbox activation and external consent testing remain pending the platform app configuration. See [setup and verification](PAYPAL_SELLER_CONNECTION.md). Included in this source release; hosted deployment remains unverified.

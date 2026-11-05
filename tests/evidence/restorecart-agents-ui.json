@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-05",
+  "environment": "isolated local production build on port 4391, NODE_ENV=test, temporary SQLite",
+  "paymentFixtures": "2 controlled capture references; no PayPal calls",
+  "checks": {
+    "sellerSignIn": true,
+    "agGridNextActionVisible": true,
+    "searchUpdatesCaptureTotal": {
+      "all": "40.00",
+      "oneOrder": "20.00"
+    },
+    "nextActionPolicyPlan": true,
+    "bryntumTwoBlueProposals": true,
+    "proposalClickOpensConfirmation": true,
+    "explicitConfirmationSavesOne": true,
+    "subsequentPlanExcludesSavedOrder": true,
+    "deploymentChunkFailureReloadRecovers": true
+  },
+  "scope": "Browser checks use server policy fixture mode; actual Gemini checks are in separate reports."
+}

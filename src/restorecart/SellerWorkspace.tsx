@@ -1056,6 +1056,8 @@ export function SellerWorkspace(p: Props) {
                           storageKey={`${p.session.user?.id}:${shop.id}:${sampleMode}`}
                           orders={visibleOrders}
                           onSelect={setSelectedOrder}
+                          api={sampleMode ? undefined : p.api}
+                          shopId={shop.id}
                         />
                       </Suspense>
                     </div>

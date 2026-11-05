@@ -1,0 +1,51 @@
+{
+  "generatedAt": "2026-11-05T10:04:07.219Z",
+  "base": "https://restorecart.onrender.com",
+  "passed": true,
+  "timings": [
+    {
+      "step": "/session",
+      "status": 200,
+      "elapsedMs": 470,
+      "json": true
+    },
+    {
+      "step": "/register",
+      "status": 200,
+      "elapsedMs": 471,
+      "json": true
+    },
+    {
+      "step": "/incidents",
+      "status": 201,
+      "elapsedMs": 569,
+      "json": true
+    },
+    {
+      "step": "/incidents/test-shop",
+      "status": 200,
+      "elapsedMs": 273,
+      "json": true
+    },
+    {
+      "step": "/incidents/test-shop/count",
+      "status": 200,
+      "elapsedMs": 274,
+      "json": true
+    },
+    {
+      "step": "/incidents/test-shop/publish",
+      "status": 200,
+      "elapsedMs": 269,
+      "json": true
+    },
+    {
+      "step": "/incidents/test-shop/close",
+      "status": 200,
+      "elapsedMs": 532,
+      "json": true
+    }
+  ],
+  "externalConfigured": false,
+  "testShopClosed": true
+}

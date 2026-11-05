@@ -1,3 +1,4 @@
+import { nextOrderAction, allowedOrderActions } from "./orderAdvice";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { AgGridReact } from "ag-grid-react";
 import {
@@ -18,14 +19,38 @@ export default function OrderTable({
   orders,
   onSelect,
   storageKey,
+  api,
+  shopId,
 }: {
   orders: any[];
   onSelect: (id: string) => void;
   storageKey?: string;
+  api?: (path: string, body?: any) => Promise<any>;
+  shopId?: string;
 }) {
   const [search, setSearch] = useState(""),
     [view, setView] = useState<OrderView>("all"),
     [totals, setTotals] = useState(orderTotals(orders));
+  const [plan, setPlan] = useState<any>(null),
+    [planning, setPlanning] = useState(false),
+    [planError, setPlanError] = useState("");
+  const orderVersion = JSON.stringify(
+    orders.map((o) => [
+      o.id,
+      o.state,
+      o.capture,
+      o.refunded,
+      o.fulfillment,
+      o.pickupWindow,
+      o.refund,
+    ]),
+  );
+  useEffect(() => {
+    setPlan(null);
+    setPlanError("");
+  }, [orderVersion, shopId]);
+  const versionRef = useRef(orderVersion);
+  versionRef.current = orderVersion;
   const grid = useRef<any>(null),
     restoring = useRef(false);
   const viewRef = useRef(view);
@@ -65,7 +90,7 @@ export default function OrderTable({
         field: "id",
         minWidth: 160,
         valueFormatter: (p) =>
-          p.data.sample
+          p.data?.sample
             ? `Sample ${String(p.value).split("-").pop()}`
             : String(p.value || "").slice(-8),
       },
@@ -74,20 +99,34 @@ export default function OrderTable({
         colId: "items",
         minWidth: 220,
         valueGetter: (p) =>
-          p.data.snapshot.lines
+          (p.data?.snapshot?.lines || [])
             .map((l: any) => `${l.quantity} × ${l.name}`)
             .join(", "),
       },
       {
         headerName: "Status",
         colId: "status",
-        valueGetter: (p) => orderProgress(p.data).label,
+        valueGetter: (p) => (p.data ? orderProgress(p.data).label : ""),
         minWidth: 165,
+      },
+      {
+        headerName: "Next action",
+        colId: "nextAction",
+        minWidth: 210,
+        valueGetter: (p) => {
+          if (!p.data) return "";
+          const recommended = plan?.actions?.find(
+            (a: any) =>
+              a.orderId === p.data.id &&
+              allowedOrderActions(p.data).includes(a.action),
+          );
+          return recommended?.label || nextOrderAction(p.data);
+        },
       },
       {
         headerName: "Total USD",
         colId: "amount",
-        valueGetter: (p) => p.data.amount / 100,
+        valueGetter: (p) => (p.data?.amount || 0) / 100,
         filter: "agNumberColumnFilter",
         valueFormatter: (p) => `$${Number(p.value).toFixed(2)}`,
         minWidth: 125,
@@ -95,7 +134,7 @@ export default function OrderTable({
       {
         headerName: "Refunded USD",
         colId: "refunded",
-        valueGetter: (p) => p.data.refunded / 100,
+        valueGetter: (p) => (p.data?.refunded || 0) / 100,
         filter: "agNumberColumnFilter",
         valueFormatter: (p) => `$${Number(p.value).toFixed(2)}`,
         minWidth: 140,
@@ -104,7 +143,7 @@ export default function OrderTable({
         headerName: "Net USD",
         colId: "net",
         valueGetter: (p) =>
-          (p.data.state === "paid" && p.data.capture
+          (p.data?.state === "paid" && p.data.capture
             ? p.data.amount - p.data.refunded
             : 0) / 100,
         filter: "agNumberColumnFilter",
@@ -116,7 +155,7 @@ export default function OrderTable({
         colId: "pickup",
         minWidth: 190,
         valueGetter: (p) =>
-          p.data.pickupWindow
+          p.data?.pickupWindow
             ? new Date(p.data.pickupWindow.start).toLocaleString()
             : "Not scheduled",
       },
@@ -137,10 +176,53 @@ export default function OrderTable({
         ),
       },
     ],
-    [onSelect],
+    [onSelect, plan],
   );
   return (
     <div>
+      {api && shopId && !orders.some((o) => o.sample) && (
+        <div className="rc-buttonrow">
+          <button
+            type="button"
+            className="rc-button secondary"
+            disabled={planning || !orders.length}
+            onClick={async () => {
+              const version = versionRef.current;
+              setPlanning(true);
+              setPlanError("");
+              try {
+                const result = await api(
+                  `/incidents/${shopId}/agent-operations`,
+                  {},
+                );
+                if (versionRef.current === version) setPlan(result);
+              } catch (error) {
+                setPlanError(
+                  error instanceof Error
+                    ? error.message
+                    : "Operations plan could not load.",
+                );
+              } finally {
+                setPlanning(false);
+              }
+            }}
+          >
+            {planning
+              ? "Planning next actions…"
+              : "Suggest next actions with Gemini"}
+          </button>
+        </div>
+      )}
+      {planError && <p role="alert">{planError}</p>}
+      {plan && (
+        <p role="status">
+          {plan.source === "gemini"
+            ? "Gemini Operations Agent"
+            : "Verified order rules"}{" "}
+          · {plan.actions.length} proposed actions. No order or payment was
+          changed.{plan.cached ? " Cached plan." : ""}
+        </p>
+      )}
       <label>
         Search orders
         <input
@@ -180,6 +262,7 @@ export default function OrderTable({
                 "refunded",
                 "net",
                 "pickup",
+                "nextAction",
               ],
               exportedRows: "filteredAndSorted",
               processCellCallback: (p: any) => safeCsvCell(p.value),

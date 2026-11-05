@@ -4,29 +4,31 @@ RestoreCart reconstructs a catalog from surviving records, opens a temporary pic
 
 [Hosted demo](https://restorecart.onrender.com/restorecart) · [Judge access](docs/restorecart/JUDGE_ACCESS.md) · [Three-minute recording guide](DEMO_REHEARSAL_GUIDE.md) · [Submission description](docs/restorecart/SUBMISSION_DESCRIPTION.md) · [Final release status](docs/restorecart/RELEASE_CHECKLIST.md)
 
-## Reviewer guide: sandbox demo and verified persistent storage
+## Reviewer guide: resettable sandbox demo
 
-**This submission is a sandbox prototype using Turso on the hosted Render service.** On 4 November 2026, a real Render service restart retained the same authenticated session, account and controlled order. Follow-up database checks retained example image bytes, stock moves and recovery history, with zero repeat recovery changes. These checks used a controlled payment reference, not a new PayPal purchase. The service remains a low-volume prototype, not a load-tested production payment system. [Restart evidence](tests/evidence/restorecart-hosted-storage.json) · [Full backend report](docs/restorecart/BACKEND_VERIFICATION_2026_11.md).
+**The current Render deployment uses temporary local SQLite, by explicit demo scope.** Prepared products and sample statuses can be recreated from code. New accounts, actual orders, stock movements and recovery journals can disappear after a restart, redeploy or spin-down. GitHub does not preserve the running database. Download reports before redeploying; complete purchase and recovery in the same running session.
+
+A Turso migration and hosted restart test passed on 4 November, but that connection was subsequently removed. Its reports remain historical evidence of the optional adapter, not a claim about the current deployment. [Current agent/backend report](docs/restorecart/AGENT_IMPLEMENTATION_REPORT.md).
 
 | What a reviewer sees | Where it comes from | Storage behavior |
 | --- | --- | --- |
-| Prepared Sunday Studio catalog and review draft | Sample source records plus saved seller edits | Operational records use Turso; fixtures can seed an empty database |
+| Prepared Sunday Studio catalog and review draft | Sample source records plus saved seller edits | Resettable SQLite records; fixtures can seed an empty database |
 | Sample preview order statuses and pickup appointments | UI-only simulated examples | Reappear from code; never affect PayPal totals, stock or recovery |
-| A buyer's actual PayPal sandbox checkout | PayPal sandbox API plus RestoreCart's database | App records use Turso; the restart check used a controlled payment reference |
-| Seller fulfillment and duplicate-safe local-file recovery | Recorded orders and recovery journals | Persisted in Turso; repeat recovery verified with zero additional changes |
+| A buyer's actual PayPal sandbox checkout | PayPal sandbox API plus RestoreCart's database | New app records are temporary; PayPal retains its own sandbox transaction |
+| Seller fulfillment and duplicate-safe local-file recovery | Recorded orders and recovery journals | SQLite journal prevents duplicates while retained; reset loses that journal |
 
 
 Pushing this repository to GitHub preserves source code and sample fixtures, **not the running database**. Private operational databases and credentials are intentionally excluded. Shop backup downloads contain catalog/shop data, not orders or payment history.
 
 ### Evidence and how to reproduce it
 
-- **Current automated verification:** 164 tests passed on 4 November 2026; production build passed. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current backend verification and measured AI results](docs/restorecart/BACKEND_VERIFICATION_2026_11.md).
+- **Current automated verification:** 178 tests passed on 5 November 2026; production build passed. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current backend verification and measured AI results](docs/restorecart/BACKEND_VERIFICATION_2026_11.md).
 - **Historical real sandbox E2E:** the documented local run used live Gemini and a $52 PayPal sandbox capture, followed by fulfillment, backup restoration and duplicate-safe local recovery. The historical 84-test count belongs to that earlier run. [Recorded E2E report](docs/restorecart/FINAL_E2E_REPORT.md).
 - **Local demonstration:** follow the [input/button rehearsal guide](DEMO_REHEARSAL_GUIDE.md) to show actual sandbox checkout, Orders, pickup tracking and recovery in one running session. Clearly identify Sample preview and saved Gemini replay. An edited demonstration should not imply simulated examples are actual payments.
 - **Submission video:** final public video link is pending. The recording should show the working flow and distinguish sample statuses, saved AI replay and actual sandbox purchases. No claim is made here that an unlinked video has already been reviewed.
-- **Historical hosted checkout verification:** implementation commit `85c9474` was deployed on 31 October 2026 and completed a real $52 PayPal sandbox capture, seller fulfillment, buyer pickup tracking and local-file recovery with zero repeat changes. [Hosted release report](docs/restorecart/HOSTED_RELEASE_REPORT.md). Webhook delivery was not independently observed in that journey; it used the verified server payment flow. That earlier deployment used temporary storage. The separate 4 November Turso/restart verification above supersedes its storage limitation; it does not represent a new PayPal purchase.
+- **Historical hosted checkout verification:** implementation commit `85c9474` was deployed on 31 October 2026 and completed a real $52 PayPal sandbox capture, seller fulfillment, buyer pickup tracking and local-file recovery with zero repeat changes. [Hosted release report](docs/restorecart/HOSTED_RELEASE_REPORT.md). Webhook delivery was not independently observed in that journey; it used the verified server payment flow. That earlier deployment used temporary storage. The separate 4 November Turso/restart verification is historical; current hosting again uses temporary SQLite.
 
-WooCommerce is an optional seller-configured connector. Automated contract tests exist; real-store verification is pending. It is not required to run the supported local Original Store JSON v1 recovery demonstration. Local Turso/libSQL persistence has been activated and verified using the [setup and migration guide](docs/restorecart/EXTERNAL_STORAGE.md).
+WooCommerce is an optional seller-configured connector. Automated contract tests exist; real-store verification is pending. It is not required to run the supported local Original Store JSON v1 recovery demonstration. The optional Turso/libSQL adapter remains available through the [setup and migration guide](docs/restorecart/EXTERNAL_STORAGE.md), but is not active in the current deployment.
 
 ## Latest approved improvements
 
@@ -40,7 +42,31 @@ Saved Sunday Studio Gemini review can now be replayed with **zero API calls**, l
 
 The backend now checks claims against the correct SKU record, withholds unsupported descriptions and photo certainty, preserves blocked decisions during saved replay, and rejects cross-variant spreadsheet values. A separately instructed Gemini checker has been evaluated on actual API calls; it remains **off by default** because the live producer comparison did not demonstrate an additional error caught. Server checks stay active with no extra AI call. [Measured comparison, safeguards, setup and limitations](docs/restorecart/BACKEND_VERIFICATION_2026_11.md).
 
-The existing local rehearsal data was preserved and migrated to Turso: all 24 original rows across 16 tables were compared unchanged. Separate application processes retained controlled order records, account/image data and recovery history; repeated recovery applied zero new changes. These are actual remote-database checks using controlled payment references. The hosted session, account and controlled order also survived an actual Render restart. [Persistence evidence](tests/evidence/restorecart-turso-persistence.json).
+Historical 4 November check, before disconnecting Turso: the local rehearsal data was preserved and migrated: all 24 original rows across 16 tables were compared unchanged. Separate application processes retained controlled order records, account/image data and recovery history; repeated recovery applied zero new changes. These are actual remote-database checks using controlled payment references. The hosted session, account and controlled order also survived an actual Render restart. [Persistence evidence](tests/evidence/restorecart-turso-persistence.json).
+
+## Three specialized Gemini roles
+
+The coordinator conditionally hands work between three roles using one Gemini provider and key. **Catalog Agent** reads uploaded evidence and proposes products. **Conflict Investigator** inspects unresolved SKU records and asks targeted questions. **Operations Agent** inspects recorded orders and proposes allowed next actions and pickup slots. They run within bounded requests, rather than simultaneously on every click.
+
+Server evidence checks, verified payment state, availability constraints and seller approval remain authoritative. Agents cannot publish, confirm physical stock, charge/refund or save appointments. The separate general-purpose second checker remains off; the specialized Conflict Investigator is an active, different workflow. A seller edit updates readiness without spending another model call. Each run records role, version, tool outcomes, usage and timing; owner-protected history excludes private reasoning.
+
+```mermaid
+flowchart LR
+    Sources["Uploaded records"] --> Catalog["Catalog Agent"]
+    Catalog --> Gate["Server evidence validation"]
+    Gate --> Conflict["Conflict Investigator when needed"]
+    Conflict --> Seller["Seller resolves and confirms"]
+    Gate --> Seller
+    Seller --> Publish["Explicit publication"]
+    Orders["Verified order and pickup facts"] --> Ops["Operations Agent"]
+    Ops --> Rules["Server action and overlap checks"]
+    Rules --> Views["AG Grid next actions and Bryntum proposals"]
+    Views --> Confirm["Seller confirms appointment"]
+```
+
+In **Orders**, use **Suggest next actions with Gemini** to prioritize permitted actions. Default row advice is deterministic. In **Pickup schedule**, save opening dates, then **Suggest pickup plan with Gemini** → **Review appointment** → **Confirm appointment**. Blue timeline events are unsaved proposals. The server computes times and rejects stale or overlapping changes; buyers see only saved appointments. Sample preview is read-only and makes no AI calls.
+
+[Implementation, tools and measured checks](docs/restorecart/AGENT_IMPLEMENTATION_REPORT.md) · [Controlled agent tests](tests/restorecart-agents.test.ts) · [Actual Gemini evaluation](tests/evidence/restorecart-live-agents.json).
 
 ## Seller PayPal connection
 
@@ -252,7 +278,7 @@ See [migration audit and verification](docs/restorecart/HOSTED_DEMO_AND_ORDERS.m
 
 ### External persistence and WooCommerce readiness
 
-Free Render compute can use the optional Turso/libSQL adapter. Accounts, binary source uploads, receipts, payment reconciliation and recovery journals are stored directly in the configured remote database. See [setup and guarded migration](docs/restorecart/EXTERNAL_STORAGE.md). Local SQLite remains the unconfigured development default. The current private local configuration and hosted Render service use Turso; a controlled hosted restart check passed on 4 November 2026. The prototype synchronously waits for SQL worker replies, so remote latency can block other requests; load testing is pending.
+Free Render compute can use the optional Turso/libSQL adapter. Accounts, binary source uploads, receipts, payment reconciliation and recovery journals are stored directly in the configured remote database. See [setup and guarded migration](docs/restorecart/EXTERNAL_STORAGE.md). Local SQLite remains the unconfigured development default. The current local rehearsal and hosted Render configuration use temporary SQLite. A controlled Turso hosted restart check passed on 4 November 2026 before the connection was removed. The prototype synchronously waits for SQL worker replies, so remote latency can block other requests; load testing is pending.
 
 WooCommerce Settings lets each seller enter a public root HTTPS test-store URL and private credentials without per-store operator approval (one server-side encryption key must be configured). Connection testing is read-only; recovery preview and confirmed return are separate actions. [Connection setup and supported scope](docs/restorecart/WOOCOMMERCE_TEST_CONNECTOR.md). Automated tests cover uncertain outcomes and duplicate-safe restart recovery. **A real WooCommerce test store and live connector verification are still pending.** No payment is collected again during return.
 

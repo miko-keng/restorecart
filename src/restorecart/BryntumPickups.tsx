@@ -8,43 +8,71 @@ export default function BryntumPickups({
   orders,
   onSelect,
   onPropose,
+  proposals = [],
+  onProposalSelect,
 }: {
   orders: any[];
   onSelect?: (id: string) => void;
   onPropose?: (id: string, start: string, end: string) => void;
+  proposals?: { orderId: string; start: string; end: string }[];
+  onProposalSelect?: (id: string) => void;
 }) {
-  const key = JSON.stringify(
+  const key = JSON.stringify([
     orders.map((o) => [o.id, o.pickupWindow, o.fulfillment]),
-  );
+    proposals,
+  ]);
   const project = useMemo(
     () => ({
       resources: [{ id: "counter", name: "Pickup counter" }],
-      events: orders.map((o) => ({
-        id: o.id,
-        name: `Order ${o.id.slice(-8)} · ${o.fulfillment === "ready" ? "Ready" : o.fulfillment === "collected" ? "Collected" : "Preparing"}`,
-        startDate: new Date(o.pickupWindow.start),
-        endDate: new Date(o.pickupWindow.end),
-        manuallyScheduled: true,
-        draggable:
-          !!onPropose &&
-          !o.sample &&
-          o.fulfillment !== "collected" &&
-          o.refund?.state !== "checking",
-        eventColor: o.fulfillment === "ready" ? "green" : "orange",
-      })),
-      assignments: orders.map((o) => ({
-        id: o.id,
-        eventId: o.id,
-        resourceId: "counter",
-      })),
+      events: [
+        ...orders.map((o) => ({
+          id: o.id,
+          name: `Order ${o.id.slice(-8)} · ${o.fulfillment === "ready" ? "Ready" : o.fulfillment === "collected" ? "Collected" : "Preparing"}`,
+          startDate: new Date(o.pickupWindow.start),
+          endDate: new Date(o.pickupWindow.end),
+          manuallyScheduled: true,
+          draggable:
+            !!onPropose &&
+            !o.sample &&
+            o.fulfillment !== "collected" &&
+            o.refund?.state !== "checking",
+          eventColor: o.fulfillment === "ready" ? "green" : "orange",
+        })),
+        ...proposals.map((p) => ({
+          id: `proposal:${p.orderId}`,
+          name: `Proposed · Order ${p.orderId.slice(-8)}`,
+          startDate: new Date(p.start),
+          endDate: new Date(p.end),
+          manuallyScheduled: true,
+          draggable: false,
+          eventColor: "blue",
+        })),
+      ],
+      assignments: [
+        ...orders.map((o) => ({
+          id: o.id,
+          eventId: o.id,
+          resourceId: "counter",
+        })),
+        ...proposals.map((p) => ({
+          id: `proposal:${p.orderId}`,
+          eventId: `proposal:${p.orderId}`,
+          resourceId: "counter",
+        })),
+      ],
     }),
     [key],
   );
   const start =
-      Math.min(...orders.map((o) => Date.parse(o.pickupWindow.start))) -
-      1800000,
+      Math.min(
+        ...orders.map((o) => Date.parse(o.pickupWindow.start)),
+        ...proposals.map((p) => Date.parse(p.start)),
+      ) - 1800000,
     end =
-      Math.max(...orders.map((o) => Date.parse(o.pickupWindow.end))) + 1800000;
+      Math.max(
+        ...orders.map((o) => Date.parse(o.pickupWindow.end)),
+        ...proposals.map((p) => Date.parse(p.end)),
+      ) + 1800000;
   return (
     <div className="rc-pickup-timeline">
       <BryntumSchedulerPro
@@ -56,7 +84,9 @@ export default function BryntumPickups({
         viewPreset="hourAndDay"
         readOnly={!onPropose}
         onEventClick={({ eventRecord }: any) =>
-          onSelect?.(String(eventRecord.id))
+          String(eventRecord.id).startsWith("proposal:")
+            ? onProposalSelect?.(String(eventRecord.id).slice(9))
+            : onSelect?.(String(eventRecord.id))
         }
         onBeforeEventDelete={() => false}
         onBeforeEventDrag={({ eventRecord }: any) =>
@@ -68,12 +98,9 @@ export default function BryntumPickups({
           const id = String(context.eventRecord.id),
             start = context.startDate,
             end = context.endDate;
+          const valid = context.valid !== false;
           context.finalize(false);
-          if (
-            context.valid !== false &&
-            start instanceof Date &&
-            end instanceof Date
-          )
+          if (valid && start instanceof Date && end instanceof Date)
             onPropose?.(id, start.toISOString(), end.toISOString());
         }}
         eventEditFeature={false}

@@ -1,3 +1,4 @@
+import { readApiResponse } from "./apiResponse";
 import { preferredShop } from "./selection";
 import { OrderProgress } from "./OrderProgress";
 import { SellerWorkspace } from "./SellerWorkspace";
@@ -53,9 +54,7 @@ async function api(path: string, body?: unknown, method?: string) {
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  const data = await response.json();
-  if (!response.ok)
-    throw Error(data.error?.message || "Request did not finish.");
+  const data = await readApiResponse(response, path);
   if (
     body !== undefined &&
     (path.endsWith("/cart") || path.endsWith("/basket-items"))

@@ -23,7 +23,8 @@ export default function PickupSchedule({
     [pending, setPending] = useState<any>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [notice, setNotice] = useState("");
+    [notice, setNotice] = useState(""),
+    [agentPlan, setAgentPlan] = useState<any>(null);
   const sample = orders.some((o) => o.sample);
   const editable = !!api && !!shopId && !sample;
   const refresh = () =>
@@ -33,6 +34,7 @@ export default function PickupSchedule({
     setPending(null);
     setError("");
     setNotice("");
+    setAgentPlan(null);
     let alive = true;
     if (editable)
       api(`/incidents/${shopId}/pickup-availability`)
@@ -89,6 +91,81 @@ export default function PickupSchedule({
       {notice && <p role="status">{notice}</p>}
       {editable && (
         <>
+          <div className="rc-buttonrow">
+            <button
+              type="button"
+              className="rc-button secondary"
+              disabled={busy || !eligible.some((o) => !o.pickupWindow)}
+              onClick={() =>
+                void run(async () => {
+                  const result = await api(
+                    `/incidents/${shopId}/agent-operations`,
+                    {
+                      from: new Date().toISOString(),
+                      minutes: 20,
+                      goal: "pickups",
+                    },
+                  );
+                  setAgentPlan(result);
+                })
+              }
+            >
+              Suggest pickup plan with Gemini
+            </button>
+          </div>
+          {agentPlan && (
+            <div
+              className="rc-notice rc-agent-plan"
+              aria-label="Proposed pickup plan"
+            >
+              <h4>
+                {agentPlan.source === "gemini"
+                  ? "Gemini Operations Agent"
+                  : "Verified scheduling rules"}
+              </h4>
+              <p>
+                Proposed appointments only. Review and confirm each appointment
+                to update the buyer receipt.
+              </p>
+              {!agentPlan.pickups.length && (
+                <p>
+                  No eligible slot was found. Save pickup opening dates or
+                  review the orders.
+                </p>
+              )}
+              <ul>
+                {agentPlan.pickups.map((slot: any) => (
+                  <li key={slot.orderId}>
+                    Order {slot.orderId.slice(-8)} ·{" "}
+                    {new Date(slot.start).toLocaleString()} –{" "}
+                    {new Date(slot.end).toLocaleTimeString()}{" "}
+                    <button
+                      type="button"
+                      className="rc-link"
+                      disabled={busy}
+                      onClick={() => {
+                        if (!eligible.some((o) => o.id === slot.orderId)) {
+                          setError(
+                            "This order changed. Refresh the schedule before applying a proposal.",
+                          );
+                          return;
+                        }
+                        setPending({
+                          id: slot.orderId,
+                          start: slot.start,
+                          end: slot.end,
+                          expected: slot.expected,
+                        });
+                      }}
+                    >
+                      Review appointment
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <details>
             <summary>Pickup opening dates</summary>
             <p>
@@ -203,7 +280,7 @@ export default function PickupSchedule({
           )}
           {pending && (
             <div
-              className="rc-notice"
+              className="rc-notice rc-agent-plan"
               role="region"
               aria-label="Confirm pickup change"
             >
@@ -228,6 +305,7 @@ export default function PickupSchedule({
                         expected: pending.expected,
                       });
                       setPending(null);
+                      setAgentPlan(null);
                       await onSaved?.();
                       setNotice(
                         "Pickup appointment saved. The buyer receipt will show the new time.",
@@ -249,7 +327,7 @@ export default function PickupSchedule({
           )}
         </>
       )}
-      {!appointments.length ? (
+      {!appointments.length && !agentPlan?.pickups?.length ? (
         <p>No pickup appointments saved yet.</p>
       ) : (
         <>
@@ -257,6 +335,13 @@ export default function PickupSchedule({
             <Suspense fallback={<p>Loading pickup timeline…</p>}>
               <BryntumPickups
                 orders={appointments}
+                proposals={agentPlan?.pickups || []}
+                onProposalSelect={(id) => {
+                  const slot = agentPlan?.pickups?.find(
+                    (p: any) => p.orderId === id,
+                  );
+                  if (slot) setPending({ id, ...slot });
+                }}
                 onSelect={onSelect}
                 onPropose={editable ? propose : undefined}
               />
