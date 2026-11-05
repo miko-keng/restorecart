@@ -1,6 +1,6 @@
 # Latest implementation status — 5 November 2026
 
-The three specialized Gemini roles, bounded tool calls, AG Grid next actions and Bryntum confirmed proposals are implemented. Current verification and limitations: [agent report](AGENT_IMPLEMENTATION_REPORT.md). Current hosting is temporary SQLite at the user's request; older Turso evidence below is historical. All 178 automated tests and the production build passed. The full live provider run encountered intermittent 503 responses; independent investigator and operations calls succeeded. No new PayPal capture was performed in this update.
+The three specialized Gemini roles, bounded tool calls, AG Grid next actions and Bryntum confirmed proposals are implemented. Current verification and limitations: [agent report](AGENT_IMPLEMENTATION_REPORT.md). Current hosting is temporary SQLite at the user's request; older Turso evidence below is historical. All 184 automated tests and the production build passed. The full live provider run encountered intermittent 503 responses; independent investigator and operations calls succeeded. No new PayPal capture was performed in this update.
 
 ---
 

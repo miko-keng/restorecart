@@ -149,7 +149,12 @@ export function suggestPickupWindow(db: DB, id: string, input: unknown) {
     409,
   );
 }
-export function savePickupWindow(db: DB, id: string, input: unknown) {
+export function savePickupWindow(
+  db: DB,
+  id: string,
+  input: unknown,
+  onSaved?: () => void,
+) {
   const b = z
     .object({
       start: z.string().datetime({ offset: true }),
@@ -218,6 +223,7 @@ export function savePickupWindow(db: DB, id: string, input: unknown) {
         end: new Date(end).toISOString(),
       }),
     );
+    onSaved?.();
     return {
       start: new Date(start).toISOString(),
       end: new Date(end).toISOString(),

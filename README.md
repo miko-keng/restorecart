@@ -22,7 +22,7 @@ Pushing this repository to GitHub preserves source code and sample fixtures, **n
 
 ### Evidence and how to reproduce it
 
-- **Current automated verification:** 178 tests passed on 5 November 2026; production build passed. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current backend verification and measured AI results](docs/restorecart/BACKEND_VERIFICATION_2026_11.md).
+- **Current automated verification:** 184 tests passed on 5 November 2026; production build passed. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current backend verification and measured AI results](docs/restorecart/BACKEND_VERIFICATION_2026_11.md).
 - **Historical real sandbox E2E:** the documented local run used live Gemini and a $52 PayPal sandbox capture, followed by fulfillment, backup restoration and duplicate-safe local recovery. The historical 84-test count belongs to that earlier run. [Recorded E2E report](docs/restorecart/FINAL_E2E_REPORT.md).
 - **Local demonstration:** follow the [input/button rehearsal guide](DEMO_REHEARSAL_GUIDE.md) to show actual sandbox checkout, Orders, pickup tracking and recovery in one running session. Clearly identify Sample preview and saved Gemini replay. An edited demonstration should not imply simulated examples are actual payments.
 - **Submission video:** final public video link is pending. The recording should show the working flow and distinguish sample statuses, saved AI replay and actual sandbox purchases. No claim is made here that an unlinked video has already been reviewed.
@@ -64,7 +64,7 @@ flowchart LR
     Views --> Confirm["Seller confirms appointment"]
 ```
 
-In **Orders**, use **Suggest next actions with Gemini** to prioritize permitted actions. Default row advice is deterministic. In **Pickup schedule**, save opening dates, then **Suggest pickup plan with Gemini** → **Review appointment** → **Confirm appointment**. Blue timeline events are unsaved proposals. The server computes times and rejects stale or overlapping changes; buyers see only saved appointments. Sample preview is read-only and makes no AI calls.
+In **Orders → Actual sandbox orders**, open **Chat with Gemini**. Type an order question or choose **Review orders** / **Plan pickups**. Each recommendation shows the order, verified facts and **Approve / Reject** buttons. Approving a pickup saves its exact proposed time after current server checks; other approvals open the order so the seller can complete the task. Rejection records a dismissal. Default grid advice is deterministic. In **Pickup schedule**, save opening dates, then **Suggest pickup plan with Gemini** → **Review appointment** → **Confirm appointment**. Blue timeline events are unsaved proposals. The server computes times and rejects stale or overlapping changes; buyers see only saved appointments. Sample preview is read-only and makes no AI calls.
 
 [Implementation, tools and measured checks](docs/restorecart/AGENT_IMPLEMENTATION_REPORT.md) · [Controlled agent tests](tests/restorecart-agents.test.ts) · [Actual Gemini evaluation](tests/evidence/restorecart-live-agents.json).
 

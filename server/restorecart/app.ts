@@ -1,6 +1,6 @@
 import { AGENT_ROLES } from "./agentRuntime";
 import { reconstructWithAgents, agentProgress } from "./agentCoordinator";
-import { planOperations } from "./operationsAgent";
+import { planOperations, decideOperation } from "./operationsAgent";
 import {
   mountPayPalConnections,
   paymentDestination,
@@ -690,6 +690,14 @@ export function createApp(
     seller,
     asyncRoute(async (req, res) => {
       res.json(await planOperations(db, parseId(req), req.body));
+    }),
+  );
+  router.post(
+    "/incidents/:id/agent-operations/decision",
+    seller,
+    asyncRoute(async (req, res) => {
+      const actor = userFor(db, res.locals.session)!;
+      res.json(decideOperation(db, parseId(req), actor.id, req.body));
     }),
   );
   router.get("/orders", seller, (req, res) => {

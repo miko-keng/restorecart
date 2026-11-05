@@ -19,38 +19,16 @@ export default function OrderTable({
   orders,
   onSelect,
   storageKey,
-  api,
-  shopId,
+  plan,
 }: {
   orders: any[];
   onSelect: (id: string) => void;
   storageKey?: string;
-  api?: (path: string, body?: any) => Promise<any>;
-  shopId?: string;
+  plan?: any;
 }) {
   const [search, setSearch] = useState(""),
     [view, setView] = useState<OrderView>("all"),
     [totals, setTotals] = useState(orderTotals(orders));
-  const [plan, setPlan] = useState<any>(null),
-    [planning, setPlanning] = useState(false),
-    [planError, setPlanError] = useState("");
-  const orderVersion = JSON.stringify(
-    orders.map((o) => [
-      o.id,
-      o.state,
-      o.capture,
-      o.refunded,
-      o.fulfillment,
-      o.pickupWindow,
-      o.refund,
-    ]),
-  );
-  useEffect(() => {
-    setPlan(null);
-    setPlanError("");
-  }, [orderVersion, shopId]);
-  const versionRef = useRef(orderVersion);
-  versionRef.current = orderVersion;
   const grid = useRef<any>(null),
     restoring = useRef(false);
   const viewRef = useRef(view);
@@ -180,49 +158,6 @@ export default function OrderTable({
   );
   return (
     <div>
-      {api && shopId && !orders.some((o) => o.sample) && (
-        <div className="rc-buttonrow">
-          <button
-            type="button"
-            className="rc-button secondary"
-            disabled={planning || !orders.length}
-            onClick={async () => {
-              const version = versionRef.current;
-              setPlanning(true);
-              setPlanError("");
-              try {
-                const result = await api(
-                  `/incidents/${shopId}/agent-operations`,
-                  {},
-                );
-                if (versionRef.current === version) setPlan(result);
-              } catch (error) {
-                setPlanError(
-                  error instanceof Error
-                    ? error.message
-                    : "Operations plan could not load.",
-                );
-              } finally {
-                setPlanning(false);
-              }
-            }}
-          >
-            {planning
-              ? "Planning next actions…"
-              : "Suggest next actions with Gemini"}
-          </button>
-        </div>
-      )}
-      {planError && <p role="alert">{planError}</p>}
-      {plan && (
-        <p role="status">
-          {plan.source === "gemini"
-            ? "Gemini Operations Agent"
-            : "Verified order rules"}{" "}
-          · {plan.actions.length} proposed actions. No order or payment was
-          changed.{plan.cached ? " Cached plan." : ""}
-        </p>
-      )}
       <label>
         Search orders
         <input

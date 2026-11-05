@@ -1,3 +1,4 @@
+import { OperationsChat } from "./OperationsChat";
 import { PayPalConnectionPanel } from "./PayPalConnectionPanel";
 import { DecisionHistory } from "./DecisionHistory";
 import { SupportingRecords } from "./SupportingRecords";
@@ -74,7 +75,8 @@ export function SellerWorkspace(p: Props) {
     [refreshAttempt, setRefreshAttempt] = useState(0),
     [restoreMode, setRestoreMode] = useState("operational"),
     [dirtyForms, setDirtyForms] = useState<Record<string, boolean>>({}),
-    [operations, setOperations] = useState<any>(null);
+    [operations, setOperations] = useState<any>(null),
+    [operationsPlan, setOperationsPlan] = useState<any>(null);
   const dirtyCount = Object.values(dirtyForms).filter(Boolean).length;
   const onDirty = useCallback(
     (key: string, dirty: boolean) =>
@@ -142,6 +144,7 @@ export function SellerWorkspace(p: Props) {
     setMessage("");
     setReadiness(null);
     setOrders([]);
+    setOperationsPlan(null);
     setSelectedOrder("");
     setFilter("All");
     setContact(null);
@@ -1044,6 +1047,21 @@ export function SellerWorkspace(p: Props) {
                     </button>
                   ))}
                 </div>
+                {!sampleMode && (
+                  <OperationsChat
+                    key={shop.id}
+                    shopId={shop.id}
+                    orders={orders}
+                    api={p.api}
+                    onPlan={setOperationsPlan}
+                    onSaved={refreshOrders}
+                    onOpenOrder={(id) => {
+                      setSelectedOrder(id);
+                      setFilter("All");
+                      setOrderView("Details");
+                    }}
+                  />
+                )}
                 <OrderViewBoundary
                   key={`${orderView}:${sampleMode}`}
                   onFallback={() => setOrderView("Details")}
@@ -1056,8 +1074,7 @@ export function SellerWorkspace(p: Props) {
                           storageKey={`${p.session.user?.id}:${shop.id}:${sampleMode}`}
                           orders={visibleOrders}
                           onSelect={setSelectedOrder}
-                          api={sampleMode ? undefined : p.api}
-                          shopId={shop.id}
+                          plan={sampleMode ? null : operationsPlan}
                         />
                       </Suspense>
                     </div>
@@ -1101,43 +1118,54 @@ export function SellerWorkspace(p: Props) {
                 ) : (
                   ["Orders", "Details"].includes(orderView) && (
                     <div className="rc-order-details">
-                      {visibleOrders.map((o) => (
-                        <div
-                          key={`${sampleMode}:${o.id}`}
-                          className={
-                            selectedOrder === o.id || orderView === "Details"
-                              ? "rc-selected-order"
-                              : "rc-mobile-order"
-                          }
-                        >
-                          {selectedOrder === o.id && (
-                            <button
-                              className="rc-link"
-                              onClick={() => setSelectedOrder("")}
-                            >
-                              Close order details
-                            </button>
-                          )}
-                          {sampleMode ? (
-                            <article className="rc-panel">
-                              <h3>Sample order · {o.id}</h3>
-                              <p>1 × Blue mug · $20.00</p>
-                              <OrderProgress order={o} />
-                              <small>
-                                Preview only. To manage a purchase, switch to
-                                Actual sandbox orders.
-                              </small>
-                            </article>
-                          ) : (
-                            <SellerOrder
-                              order={o}
-                              shop={shop}
-                              p={p}
-                              refreshed={refreshOrders}
-                            />
-                          )}
-                        </div>
-                      ))}
+                      {visibleOrders
+                        .filter(
+                          (o) =>
+                            orderView !== "Details" ||
+                            !selectedOrder ||
+                            o.id === selectedOrder,
+                        )
+                        .map((o) => (
+                          <div
+                            key={`${sampleMode}:${o.id}`}
+                            className={
+                              selectedOrder === o.id || orderView === "Details"
+                                ? "rc-selected-order"
+                                : "rc-mobile-order"
+                            }
+                          >
+                            {selectedOrder === o.id && (
+                              <button
+                                className="rc-link"
+                                onClick={() => {
+                                  setSelectedOrder("");
+                                  if (orderView === "Details")
+                                    setOrderView("Orders");
+                                }}
+                              >
+                                Close order details
+                              </button>
+                            )}
+                            {sampleMode ? (
+                              <article className="rc-panel">
+                                <h3>Sample order · {o.id}</h3>
+                                <p>1 × Blue mug · $20.00</p>
+                                <OrderProgress order={o} />
+                                <small>
+                                  Preview only. To manage a purchase, switch to
+                                  Actual sandbox orders.
+                                </small>
+                              </article>
+                            ) : (
+                              <SellerOrder
+                                order={o}
+                                shop={shop}
+                                p={p}
+                                refreshed={refreshOrders}
+                              />
+                            )}
+                          </div>
+                        ))}
                     </div>
                   )
                 )}

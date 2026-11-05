@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-05",
+  "environment": "isolated local production build, controlled paid-order references, NODE_ENV=test",
+  "providerCalls": 0,
+  "checks": {
+    "chatDialogOpens": true,
+    "typedOrderQuestion": true,
+    "orderFactsAndActionCardsVisible": true,
+    "rejectShowsNoOrderChanges": true,
+    "pickupGoalShowsPickupCard": true,
+    "approvePickupShowsSaved": true,
+    "approvePreparationOpensOrderControls": true
+  },
+  "scope": "UI uses verified policy fixtures, not a live Gemini chat or PayPal transaction. Real Gemini roles were evaluated separately."
+}

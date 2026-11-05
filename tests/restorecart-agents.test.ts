@@ -27,10 +27,14 @@ import {
 } from "../server/restorecart/agentCoordinator";
 import {
   planOperations,
+  decideOperation,
   proposePickupSlots,
 } from "../server/restorecart/operationsAgent";
 import { prepareSampleShop } from "../server/restorecart/demo";
-import { savePickupAvailability } from "../server/restorecart/pickups";
+import {
+  savePickupAvailability,
+  savePickupWindow,
+} from "../server/restorecart/pickups";
 import { putMeta } from "../server/restorecart/continuity";
 import {
   allowedOrderActions,
@@ -540,5 +544,229 @@ test("catalog provider failure records a bounded failed run without publishing",
     assert.equal(incident(db, id).state, "draft");
   } finally {
     db.close();
+  }
+});
+
+test("Operations chat forwards bounded conversation and returns the model reply without executing its proposal", async () => {
+  const f = await operationFixture();
+  try {
+    const before = orderSnapshot(f.db);
+    const result = await planOperations(
+      f.db,
+      f.id,
+      {
+        message: "Which order should I prepare first?",
+        conversation: [{ role: "user", text: "I have one pickup counter." }],
+      },
+      async (_url, init) => {
+        const body = JSON.parse(String(init?.body)),
+          context = JSON.parse(body.contents[0].parts[0].text);
+        assert.equal(
+          context.sellerRequest,
+          "Which order should I prepare first?",
+        );
+        assert.equal(context.conversation.length, 1);
+        return reply("proposeOperations", {
+          reply: "Prepare the first paid order, then arrange pickup.",
+          actions: [{ orderId: f.purchases[0], action: "prepare" }],
+        });
+      },
+    );
+    assert.match(result.reply, /first paid order/);
+    assert.equal(orderSnapshot(f.db), before);
+    await assert.rejects(
+      planOperations(f.db, f.id, { message: "x".repeat(601) }),
+    );
+    await assert.rejects(
+      planOperations(f.db, f.id, {
+        conversation: Array(7).fill({ role: "user", text: "x" }),
+      }),
+    );
+  } finally {
+    f.db.close();
+  }
+});
+
+test("Approving a preparation recommendation opens its order and rejects forged or contradictory decisions", async () => {
+  const f = await operationFixture();
+  try {
+    const plan = await planOperations(f.db, f.id, {}),
+      before = orderSnapshot(f.db);
+    const b = {
+      runId: plan.agentRunId,
+      orderId: f.purchases[0],
+      action: "prepare",
+      decision: "approve",
+    };
+    const result = decideOperation(f.db, f.id, "seller-fixture", b);
+    assert.equal(result.effect, "open_order");
+    assert.equal(result.actor, "seller-fixture");
+    assert.equal(orderSnapshot(f.db), before);
+    assert.equal(
+      decideOperation(f.db, f.id, "seller-fixture", b).replayed,
+      true,
+    );
+    assert.throws(
+      () =>
+        decideOperation(f.db, f.id, "seller-fixture", {
+          ...b,
+          decision: "reject",
+        }),
+      /already has a decision/,
+    );
+    assert.throws(
+      () =>
+        decideOperation(f.db, f.id, "seller-fixture", {
+          ...b,
+          action: "notify_pickup",
+        }),
+      /not proposed/,
+    );
+    assert.throws(
+      () => decideOperation(f.db, createIncident(f.db).id, "seller-fixture", b),
+      /not from this shop/,
+    );
+  } finally {
+    f.db.close();
+  }
+});
+
+test("Rejecting a pickup recommendation records the decision without saving an appointment", async () => {
+  const f = await operationFixture();
+  try {
+    const plan = await planOperations(f.db, f.id, {
+        goal: "pickups",
+        from: f.from,
+      }),
+      before = orderSnapshot(f.db);
+    const b = {
+      runId: plan.agentRunId,
+      orderId: f.purchases[0],
+      action: "schedule_pickup",
+      decision: "reject",
+    };
+    assert.equal(
+      decideOperation(f.db, f.id, "seller-fixture", b).effect,
+      "dismissed",
+    );
+    assert.equal(
+      decideOperation(f.db, f.id, "seller-fixture", b).replayed,
+      true,
+    );
+    assert.equal(orderSnapshot(f.db), before);
+  } finally {
+    f.db.close();
+  }
+});
+
+test("Explicit pickup approval saves the exact server proposal and audit once", async () => {
+  const f = await operationFixture();
+  try {
+    const plan = await planOperations(f.db, f.id, {
+      goal: "pickups",
+      from: f.from,
+    });
+    const before = JSON.stringify(
+      f.db.prepare("SELECT * FROM rc_orders ORDER BY id").all(),
+    );
+    const b = {
+      runId: plan.agentRunId,
+      orderId: f.purchases[0],
+      action: "schedule_pickup",
+      decision: "approve",
+    };
+    const result = decideOperation(f.db, f.id, "seller-fixture", b),
+      slot = plan.pickups.find((p: any) => p.orderId === f.purchases[0]);
+    assert.equal(result.effect, "appointment_saved");
+    assert.deepEqual(result.appointment, { start: slot.start, end: slot.end });
+    assert.equal(
+      decideOperation(f.db, f.id, "seller-fixture", b).replayed,
+      true,
+    );
+    assert.equal(
+      f.db
+        .prepare("SELECT count(*) n FROM rc_meta WHERE key GLOB 'pickup:*'")
+        .get()?.n,
+      1,
+    );
+    assert.equal(
+      f.db
+        .prepare(
+          "SELECT count(*) n FROM rc_meta WHERE key GLOB 'agent-decision:*'",
+        )
+        .get()?.n,
+      1,
+    );
+    assert.equal(
+      JSON.stringify(f.db.prepare("SELECT * FROM rc_orders ORDER BY id").all()),
+      before,
+    );
+    assert.throws(
+      () =>
+        decideOperation(f.db, f.id, "seller-fixture", {
+          ...b,
+          orderId: f.purchases[1],
+        }),
+      /changed/,
+    );
+  } finally {
+    f.db.close();
+  }
+});
+
+test("Changed order state invalidates an outstanding approval", async () => {
+  const f = await operationFixture();
+  try {
+    const plan = await planOperations(f.db, f.id, {});
+    f.db
+      .prepare("UPDATE rc_orders SET fulfillment='collected' WHERE id=?")
+      .run(f.purchases[0]);
+    assert.throws(
+      () =>
+        decideOperation(f.db, f.id, "seller-fixture", {
+          runId: plan.agentRunId,
+          orderId: f.purchases[0],
+          action: "prepare",
+          decision: "approve",
+        }),
+      /changed/,
+    );
+    assert.equal(
+      f.db
+        .prepare(
+          "SELECT count(*) n FROM rc_meta WHERE key GLOB 'agent-decision:*'",
+        )
+        .get()?.n,
+      0,
+    );
+  } finally {
+    f.db.close();
+  }
+});
+
+test("Appointment save rolls back if its linked decision audit cannot be recorded", async () => {
+  const f = await operationFixture();
+  try {
+    const slot = proposePickupSlots(f.db, f.id, [f.purchases[0]], f.from)[0];
+    assert.throws(
+      () =>
+        savePickupWindow(
+          f.db,
+          f.purchases[0],
+          { start: slot.start, end: slot.end, expected: null },
+          () => {
+            throw Error("audit unavailable");
+          },
+        ),
+      /audit unavailable/,
+    );
+    assert.equal(
+      f.db
+        .prepare("SELECT count(*) n FROM rc_meta WHERE key GLOB 'pickup:*'")
+        .get()?.n,
+      0,
+    );
+  } finally {
+    f.db.close();
   }
 });

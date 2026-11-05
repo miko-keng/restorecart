@@ -59,3 +59,13 @@ RESTORECART_AGENT_CHECK_PHASE=operations node --env-file=.env --import tsx scrip
 ```
 
 Use a disposable database for test fixtures. Normal tests use controlled transports and make no provider calls. Keep keys and private environment files out of GitHub. The existing demo recording can describe the same core journey; it does not itself prove backend checks added after recording.
+
+## Follow-up: visible chat and decisions
+
+The latest order interface replaces the summary-only planning button with **Chat with Gemini**, available above the desktop/mobile order views. The popup supports a bounded seller message and the last six conversation messages. Responses display explicit cards containing the order, action and verified payment/fulfillment facts. Routine fixture mode is labelled **Verified order rules** rather than claiming a fresh Gemini response.
+
+Each actionable card offers **Approve / Reject**. Approving preparation, payment-check or pickup-instruction advice records acceptance and opens the existing order controls; it does not claim the physical task is completed or automatically charge/refund. Approving a pickup card saves the exact proposed appointment through the same eligibility, overlap and stale-booking checks. The appointment and approval audit commit together or both roll back. Reject records a dismissal without changing the order. Duplicate decisions replay the recorded result; reversing a decision requires a new plan. Changed inputs invalidate approvals. The agent itself receives no write tool.
+
+The owner/CSRF-protected decision endpoint is `POST /api/restorecart/incidents/:id/agent-operations/decision`. It accepts only a recorded plan ID, proposed order/action and approve/reject decision. It rejects foreign plans, invented actions, stale state and expired pickup times. Chat input is limited to 600 characters; prior messages are bounded to six of 800 characters. These limits share the existing run/call quotas. Chat conversation is in the current workspace session; decision records share SQLite retention limits.
+
+**184 automated tests and the production build pass**, including six new chat/decision scenarios and expanded endpoint authorization checks. This update does not claim a new live PayPal transaction or a new live Gemini chat evaluation; the earlier actual-model evidence remains separately labelled.

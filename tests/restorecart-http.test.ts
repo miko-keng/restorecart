@@ -2528,6 +2528,42 @@ test("Agent history and operations endpoints enforce seller ownership and CSRF w
       ).status,
       403,
     );
+    const fakeDecision = {
+      runId: "missing-plan",
+      orderId: "unknown",
+      action: "prepare",
+      decision: "approve",
+    };
+    for (const client of [f.buyer, f.stranger])
+      assert.equal(
+        (
+          await client.request(
+            `/incidents/${f.id}/agent-operations/decision`,
+            fakeDecision,
+          )
+        ).status,
+        403,
+      );
+    assert.equal(
+      (
+        await f.seller.request(
+          `/incidents/${f.id}/agent-operations/decision`,
+          fakeDecision,
+          "POST",
+          false,
+        )
+      ).status,
+      403,
+    );
+    assert.equal(
+      (
+        await f.seller.request(
+          `/incidents/${f.id}/agent-operations/decision`,
+          fakeDecision,
+        )
+      ).status,
+      404,
+    );
     const before = JSON.stringify(incident(f.db, f.id));
     const result = await f.seller.request(
       `/incidents/${f.id}/agent-operations`,
