@@ -1,3 +1,4 @@
+import { ReopeningChecklist } from "./ReopeningChecklist";
 import { SampleOrderChat } from "./SampleOrderChat";
 import { AiEvaluation } from "./AiEvaluation";
 import { PaymentTimeline } from "./PaymentTimeline";
@@ -357,7 +358,7 @@ export function SellerWorkspace(p: Props) {
           <div>
             <span className="rc-eyebrow">YOUR SELLER WORKSPACE</span>
             <h1>Seller workspace</h1>
-            <p>Your catalog, orders and recovery in one place.</p>
+            <p>Rebuild your catalog. Keep orders moving.</p>
             <small>
               {p.session?.storage?.externalConfigured
                 ? "External database configured. Keep recovery reports and verify records after deployment."
@@ -540,80 +541,30 @@ export function SellerWorkspace(p: Props) {
               </p>
             </div>
             {section === "Shop editor" && (
-              <section
-                className="rc-panel"
-                id="rc-reopening-checklist"
-                aria-label="Reopening checklist"
-              >
-                <h3>Reopening checklist</h3>
-                <p>
-                  Based on saved server checks. Resolve these items or hide
-                  products you do not want to sell.
-                </p>
-                {dirtyCount > 0 && (
-                  <p>Save your unsaved product edits first.</p>
-                )}
-                {publishBlockers
-                  .filter(
-                    (issue) =>
-                      !incomplete.some((r: any) =>
-                        issue.startsWith(`${r.name}:`),
-                      ),
-                  )
-                  .map((issue, i) => (
-                    <p key={i}>{issue}</p>
-                  ))}
-                {incomplete.map((r: any) => (
-                  <div key={r.sku}>
-                    <strong>{r.name}</strong>
-                    <ul>
-                      {r.questions.map((question: string) => (
-                        <li key={question}>{question}</li>
-                      ))}
-                    </ul>
-                    <button
-                      className="rc-link"
-                      key={r.sku}
-                      onClick={() => {
-                        setSection("Shop editor");
-                        requestAnimationFrame(() => {
-                          const target = document.getElementById(
-                            `rc-product-${r.sku}`,
-                          ) as HTMLDetailsElement;
-                          if (target) {
-                            target.open = true;
-                            target.scrollIntoView({
-                              block: "center",
-                              behavior: "instant",
-                            });
-                            target.querySelector("input")?.focus();
-                          }
-                        });
-                      }}
-                    >
-                      Review {r.name} →
-                    </button>
-                  </div>
-                ))}
-                {!publishBlockers.length && !dirtyCount && (
-                  <p role="status">
-                    All checks passed. Preview your saved shop, then publish
-                    when ready.
-                  </p>
-                )}
-                {readiness?.blockers?.some((b: any) => b.kind === "pickup") && (
-                  <button
-                    className="rc-link"
-                    onClick={() =>
-                      document
-                        .getElementById("rc-shop-details")
-                        ?.scrollIntoView({ block: "center" })
-                    }
-                  >
-                    Add pickup instructions →
-                  </button>
-                )}
-              </section>
+              <ReopeningChecklist
+                readiness={readiness}
+                dirtyCount={dirtyCount}
+                blockers={publishBlockers}
+                onReview={(sku: string) => {
+                  const target = document.getElementById(
+                    `rc-product-${sku}`,
+                  ) as HTMLDetailsElement;
+                  if (target) {
+                    target.open = true;
+                    target.scrollIntoView({
+                      block: "center",
+                      behavior: "instant",
+                    });
+                    target.querySelector("input")?.focus();
+                  }
+                }}
+                onPayments={() => setSection("Settings")}
+                onPickup={() =>
+                  document
+                    .getElementById("rc-shop-details")
+                    ?.scrollIntoView({ block: "center" })
+                }
+              />
             )}
             {loadError && (
               <p role="alert" className="rc-alert">
@@ -639,10 +590,7 @@ export function SellerWorkspace(p: Props) {
               !shop.conflictPractice &&
               section === "Shop editor" && (
                 <p className="rc-notice">
-                  Prepared demo: sample records and shop details are already
-                  saved. Complete the product review below. These starting
-                  records were preloaded; show the saved Gemini review or
-                  optionally run a fresh review.
+                  Sample records loaded. Review your products, then publish.
                 </p>
               )}
             {message && (
@@ -839,7 +787,7 @@ export function SellerWorkspace(p: Props) {
                   </div>
                   <p className="rc-review-status" role="status">
                     {savedReview
-                      ? "A saved Gemini answer is available. Show it without using tokens, or optionally request a fresh review of saved records."
+                      ? "Replay the saved review, or request a new one."
                       : "A fresh review checks saved records for conflicts and suggestions. It does not approve products or confirm physical stock."}
                   </p>
                   <AiEvaluation />
@@ -991,13 +939,9 @@ export function SellerWorkspace(p: Props) {
                       </p>
                     </details>
                     <p>
-                      Orders for <b>{shop.name}</b> only. Refreshes
-                      automatically every 15 seconds.
+                      <b>{shop.name}</b> · Updates every 15 seconds.
                     </p>
-                    <small>
-                      Missing an order? Check the shop selected above and the
-                      seller account that owns the published link.
-                    </small>
+                    <small>Only this shop’s orders appear here.</small>
                   </div>
                   <button
                     className="rc-button secondary"
@@ -1044,8 +988,8 @@ export function SellerWorkspace(p: Props) {
                 </div>
                 {sampleMode && (
                   <p role="status" className="rc-notice">
-                    Sample preview — no transactions. These examples never
-                    change stock, payments or recovery reports.
+                    Sample orders · No payments, stock changes or recovery
+                    records.
                   </p>
                 )}
                 <div className="rc-order-filters" aria-label="Order display">
@@ -1341,6 +1285,16 @@ export function SellerWorkspace(p: Props) {
                         <Download size={17} />
                         Download sales report
                       </button>
+                      {!closed && (
+                        <p className="rc-payment-hint">
+                          Stop new orders first.
+                        </p>
+                      )}
+                      {closed && pending.length > 0 && (
+                        <p className="rc-payment-hint">
+                          Resolve pending payments or refunds first.
+                        </p>
+                      )}
                     </li>
                   </ol>
                 </section>

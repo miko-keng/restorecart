@@ -73,9 +73,13 @@ export async function paypal(
   if (!r.ok)
     throw Object.assign(
       new Error(
-        "PayPal is still checking this request. Please check the order status before trying again.",
+        (path.startsWith("/v1/customer/partners/") ||
+          path === "/v2/customer/partner-referrals") &&
+          [401, 403].includes(r.status)
+          ? "This Platform app cannot connect sellers yet. Check its PayPal sandbox permissions."
+          : "PayPal is still checking this request. Please check the order status before trying again.",
       ),
-      { providerName: data.name },
+      { providerName: data.name, providerStatus: r.status },
     );
   return data;
 }

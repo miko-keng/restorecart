@@ -1,0 +1,31 @@
+/* Radix is scoped to payment components; retain the existing storefront identity. */
+.radix-themes.rc-payments-ui {
+  min-height: 0;
+  --default-font-family: "DM Sans Variable", sans-serif;
+  --heading-font-family: "Manrope Variable", sans-serif;
+  margin: 16px 0;
+}
+.rc-payments-ui .rc-payment-card { background: #fffefa; box-shadow: 0 2px 12px #263c3508; }
+.rc-payments-ui .rc-payment-icon { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; background: var(--teal-3); color: var(--teal-11); border-radius: 12px; }
+.rc-payments-ui .rc-payment-consent { display: flex; align-items: center; gap: 9px; width: 100%; margin: 0; font-weight: 400; }
+.rc-payment-details { margin-top: 18px; font-size: 12px; color: #657269; }
+.rc-payment-details summary { cursor: pointer; font-weight: 500; }
+.rc-payment-details p { margin: 10px 0; }
+.rc-payment-hint { margin-top: 12px !important; color: #657269; font-size: 13px; line-height: 1.6; }
+.rc-payment-error { color: #a43927; font-size: 13px; margin-top: 12px !important; }
+.rc-payments-ui .rc-payment-state { padding: 14px; border: 1px solid var(--sage-6); border-radius: 12px; margin-top: 16px; }
+.rc-payment-events { list-style: none; margin: 0; padding: 0; }
+.rc-payment-events li { position: relative; padding: 0 0 22px 24px; border-left: 2px solid var(--sage-5); margin-left: 7px; }
+.rc-payment-events li:last-child { border-left-color: transparent; padding-bottom: 0; }
+.rc-payment-events li::before { content: ""; position: absolute; left: -6px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--teal-9); box-shadow: 0 0 0 4px var(--teal-2); }
+.rc-payment-events time { color: var(--sage-11); font-size: 12px; }
+.rc-payment-events details { margin-top: 6px; font-size: 12px; color: var(--sage-11); }
+.rc-payment-events summary { cursor: pointer; }
+@media (max-width: 600px) { .rc-payments-ui .rt-Button { min-height: 40px; } .rc-payment-events time { display: block; margin-top: 4px; } }
+.rc-checklist-row { padding: 14px 0; border-bottom: 1px solid var(--sage-5); }
+.rc-checklist-row:last-child { border-bottom: 0; }
+.rc-checklist-row .rc-payment-details { margin-top: 6px; }
+/* Dialog portals must sit above the workspace's sticky publishing toolbar. */
+.rt-BaseDialogOverlay { z-index: 1000; }
+.rc-payment-events li[data-tone="warning"]::before { background: var(--amber-9); box-shadow: 0 0 0 4px var(--amber-2); }
+.rc-payment-events li[data-tone="danger"]::before { background: var(--red-9); box-shadow: 0 0 0 4px var(--red-2); }

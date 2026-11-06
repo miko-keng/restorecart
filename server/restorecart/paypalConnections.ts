@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { randomBytes } from "node:crypto";
-import { paypal, paypalReady, type PayPalContext } from "../paypal";
+import { paypal, type PayPalContext } from "../paypal";
 import { fail, hash, uid } from "./domain";
 import { type DB, tx } from "./store";
 import { requireOwned, userFor } from "./accounts";
@@ -21,14 +21,23 @@ export function partnerSettings() {
   const partner = process.env.PAYPAL_PARTNER_MERCHANT_ID || "";
   const attribution = process.env.PAYPAL_PARTNER_ATTRIBUTION_ID || "";
   const client = process.env.PAYPAL_CLIENT_ID || "";
+  const missing = [
+    ...(!client ? ["PAYPAL_CLIENT_ID"] : []),
+    ...(!process.env.PAYPAL_CLIENT_SECRET ? ["PAYPAL_CLIENT_SECRET"] : []),
+    ...(!merchantPattern.test(partner) ? ["PAYPAL_PARTNER_MERCHANT_ID"] : []),
+    ...(!/^[A-Za-z0-9_-]{1,100}$/.test(attribution)
+      ? ["PAYPAL_PARTNER_ATTRIBUTION_ID"]
+      : []),
+    ...(process.env.PAYPAL_ENV && process.env.PAYPAL_ENV !== "sandbox"
+      ? ["PAYPAL_ENV=sandbox"]
+      : []),
+  ];
   return {
     partner,
     attribution,
     client,
-    configured:
-      paypalReady() &&
-      merchantPattern.test(partner) &&
-      /^[A-Za-z0-9_-]{1,100}$/.test(attribution),
+    configured: missing.length === 0,
+    missing,
   };
 }
 function assertConfigured() {
@@ -50,6 +59,8 @@ export function connectionStatus(db: DB, id: string) {
     saved.partnerId === c.partner;
   return {
     configured: c.configured,
+    setupMissing: c.missing,
+    webhookConfigured: !!process.env.PAYPAL_WEBHOOK_ID,
     connected,
     state: connected
       ? "connected"
@@ -59,10 +70,22 @@ export function connectionStatus(db: DB, id: string) {
     merchantId: connected ? saved.merchantId : null,
     checkedAt: saved?.checkedAt || null,
     demo:
+      process.env.PAYPAL_ALLOW_SHARED_DEMO === "true" &&
       !saved &&
       !c.partner &&
       !c.attribution &&
       process.env.PAYPAL_REQUIRE_SELLER_CONNECTION !== "true",
+  };
+}
+export function checkoutStatus(db: DB, id: string) {
+  const status = connectionStatus(db, id);
+  return {
+    available: status.connected || status.demo,
+    mode: status.connected
+      ? "seller"
+      : status.demo
+        ? "shared_demo"
+        : "unavailable",
   };
 }
 export function paymentDestination(db: DB, id: string): PayPalContext | null {

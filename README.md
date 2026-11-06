@@ -22,7 +22,7 @@ Pushing this repository to GitHub preserves source code and sample fixtures, **n
 
 ### Evidence and how to reproduce it
 
-- **Current automated verification:** 184 tests passed on 5 November 2026; production build passed. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current backend verification and measured AI results](docs/restorecart/BACKEND_VERIFICATION_2026_11.md).
+- **Current automated verification:** 198 tests passed on 6 November 2026; production build passed. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current backend verification and measured AI results](docs/restorecart/BACKEND_VERIFICATION_2026_11.md).
 - **Historical real sandbox E2E:** the documented local run used live Gemini and a $52 PayPal sandbox capture, followed by fulfillment, backup restoration and duplicate-safe local recovery. The historical 84-test count belongs to that earlier run. [Recorded E2E report](docs/restorecart/FINAL_E2E_REPORT.md).
 - **Local demonstration:** follow the [input/button rehearsal guide](DEMO_REHEARSAL_GUIDE.md) to show actual sandbox checkout, Orders, pickup tracking and recovery in one running session. Clearly identify Sample preview and saved Gemini replay. An edited demonstration should not imply simulated examples are actual payments.
 - **Submission video:** final public video link is pending. The recording should show the working flow and distinguish sample statuses, saved AI replay and actual sandbox purchases. No claim is made here that an unlinked video has already been reviewed.
@@ -304,3 +304,5 @@ The card changes to **Connected** only after a successful connection check. Reco
 ### Payment history and reopening checks
 
 Actual order details show timestamped PayPal observations and their API, reconciliation or webhook origin. Product review connects source evidence to saved seller decisions and published values. The reopening checklist uses the same blockers enforced by the publish endpoint, including changed source evidence. See [reliability workflows](docs/restorecart/RELIABILITY_WORKFLOWS.md).
+
+Seller-connected sandbox checkout is now the default. Configure the Platform app and connect each seller before accepting payments. Shared-account demos require explicit opt-in. The compact payment UI uses Radix Themes; see [seller setup, UI changes and verification boundaries](docs/restorecart/SELLER_PAYMENTS_UI.md).

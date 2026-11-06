@@ -2674,3 +2674,44 @@ test("Reopening checklist agrees with publish and invalidates replaced source ev
     await f.close();
   }
 });
+
+test("Buyer basket explains missing seller connection and never silently enables shared checkout", async () => {
+  const f = await fixture();
+  const originalDemo = process.env.PAYPAL_ALLOW_SHARED_DEMO;
+  try {
+    await prepare(f);
+    const shop = incident(f.db, f.id);
+    await f.buyer.request(
+      `/shops/${shop.slug}/cart`,
+      { quantities: { "MUG-BLU": 1 }, requestKey: "seller-gating-cart" },
+      "PUT",
+    );
+    delete process.env.PAYPAL_ALLOW_SHARED_DEMO;
+    const basket = (await f.buyer.request("/basket")).data;
+    assert.equal(basket.shops[0].payment.available, false);
+    assert.equal(basket.shops[0].payment.mode, "unavailable");
+    const checkout = await f.buyer.request(`/shops/${shop.slug}/orders`, {
+      revision: shop.published!.revision,
+      requestKey: "seller-gating-checkout",
+      lines: [{ sku: "MUG-BLU", quantity: 1 }],
+    });
+    assert.equal(checkout.status, 409);
+    assert.equal(
+      (
+        f.db
+          .prepare("SELECT count(*) n FROM rc_orders WHERE incident=?")
+          .get(f.id) as any
+      ).n,
+      0,
+    );
+    process.env.PAYPAL_ALLOW_SHARED_DEMO = "true";
+    assert.equal(
+      (await f.buyer.request("/basket")).data.shops[0].payment.mode,
+      "shared_demo",
+    );
+  } finally {
+    if (originalDemo === undefined) delete process.env.PAYPAL_ALLOW_SHARED_DEMO;
+    else process.env.PAYPAL_ALLOW_SHARED_DEMO = originalDemo;
+    await f.close();
+  }
+});

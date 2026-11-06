@@ -1,4 +1,6 @@
-# RestoreCart — simple three-minute demo
+# RestoreCart — full-transaction three-minute demo
+
+For a recorded submission without buyer or PayPal login, use the [seller-only script with exact narration and buttons](docs/restorecart/RECORDED_SUBMISSION_GUIDE.md). The guide below is the separate full-transaction flow.
 
 **Story:** a shop goes offline → Gemini finds a price conflict → seller reopens → buyer pays → seller fulfills → emergency sales are returned once.
 
@@ -41,6 +43,6 @@ Keep this outside the main recording, or replace part of the Orders segment. Liv
 2. Close the chat. **Pickup schedule → Pickup opening dates:** save a future opening/closing window.
 3. **Chat with Gemini → Plan pickups** → review the order and proposed time → **Approve** to save, or **Reject** to dismiss. Close the chat and show the saved time in **Pickup schedule**. Say: “Gemini proposes a time. I review it and approve before the buyer sees it.”
 
-**Sample preview** is read-only simulated data. Saved review replay makes no new AI request. Fresh reviews and planning buttons do. If PayPal still says **Payment checking**, wait for a confirmed result before describing it as paid.
+**Sample preview** contains simulated data. Its saved-chat panel supports isolated Approve / Reject practice; the sample order table remains illustrative. Saved review replay makes no new AI request. Fresh reviews and planning buttons do. If PayPal still says **Payment checking**, wait for a confirmed result before describing it as paid.
 
 No uploads are needed for this prepared demo. The practice export is an example destination file, not a real connected store. WooCommerce's optional entry is **Settings → Connections → WooCommerce → Connect store**; keep credential setup outside this recording.

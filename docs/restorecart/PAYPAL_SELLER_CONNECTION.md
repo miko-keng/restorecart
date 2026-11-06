@@ -1,5 +1,7 @@
 # Connect PayPal — seller onboarding
 
+Updated experience and current verification: [Seller payments and simpler UI](SELLER_PAYMENTS_UI.md).
+
 Implemented locally on 3 November 2026. **153 automated tests pass and the production build passes.** This includes ten new controlled PayPal connection tests. No new real PayPal seller authorization or marketplace transaction is claimed. This source release includes the connection implementation; hosted deployment and actual sandbox activation require separate verification.
 
 ## Seller experience
@@ -11,13 +13,13 @@ Implemented locally on 3 November 2026. **153 automated tests pass and the produ
 5. Return to RestoreCart. The server looks up the seller using its own tracking ID and verifies merchant identity, confirmed email, payments receivable and grants for this platform client.
 6. The panel shows **Connected · sandbox**, merchant ID and verification date. New orders pay that merchant.
 
-If setup was incomplete or the browser return expired, finish setup on PayPal and use **I finished setup — check connection**. This uses authenticated server verification; a browser success flag never proves connection. A lost session can require signing in again. **Check connection** refreshes authorization status. **Disconnect this shop** stops new checkout; it does not move existing payments or revoke consent at PayPal. Full permission revocation is performed in the seller's PayPal account.
+If setup was incomplete or the browser return expired, finish setup on PayPal and use **I finished setup**. This uses authenticated server verification; a browser success flag never proves connection. A lost session can require signing in again. **Check connection** refreshes authorization status. **Disconnect this shop** stops new checkout; it does not move existing payments or revoke consent at PayPal. Full permission revocation is performed in the seller's PayPal account.
 
 Connection is scoped to the selected shop and its authorized seller. Reconstructed or restored backup drafts do not inherit a PayPal authorization. Connect each shop deliberately.
 
 ## Deployment activation
 
-The current private local configuration contains the original single-merchant client ID/secret. Platform merchant ID and attribution ID are absent. Therefore the connection panel is present but its action is disabled with a clear setup message. Ordinary checkout credentials alone do not establish a marketplace connection.
+The original private `.env` contains single-merchant checkout credentials; a separate private `.data/backend-verification.env` supplies sandbox Platform credentials. Test these in a separate workspace. If platform settings are missing, Connect PayPal opens a setup explanation. Ordinary checkout credentials alone do not establish a marketplace connection. Seller-connected checkout is the default. Shared demo checkout requires explicit `PAYPAL_ALLOW_SHARED_DEMO=true` and `PAYPAL_REQUIRE_SELLER_CONNECTION` not set to `true`.
 
 Configure in server-only environment variables, never in chat or `VITE_*`:
 

@@ -433,13 +433,20 @@ test("PayPal consent revocation blocks new purchases and changed platform creden
     await f.close();
   }
 });
-test("PayPal missing partner configuration is explicit; single-account demo remains available unless strict mode is enabled", async () => {
+test("PayPal defaults to seller connection; shared-account demo requires explicit opt-in", async () => {
   const f = await fixture();
   try {
     delete process.env.PAYPAL_PARTNER_MERCHANT_ID;
     delete process.env.PAYPAL_PARTNER_ATTRIBUTION_ID;
-    assert.equal((await f.seller.request(f.path)).data.demo, true);
+    delete process.env.PAYPAL_ALLOW_SHARED_DEMO;
+    assert.equal((await f.seller.request(f.path)).data.demo, false);
+    assert.throws(
+      () => paymentDestination(f.db, f.shop.id),
+      /must connect PayPal/,
+    );
     assert.equal((await f.connect()).status, 503);
+    process.env.PAYPAL_ALLOW_SHARED_DEMO = "true";
+    assert.equal((await f.seller.request(f.path)).data.demo, true);
     assert.equal(paymentDestination(f.db, f.shop.id), null);
     process.env.PAYPAL_REQUIRE_SELLER_CONNECTION = "true";
     assert.throws(
@@ -551,6 +558,286 @@ test("PayPal HTTP checkout blocks an unconnected seller before reserving invento
       MERCHANT,
     );
   } finally {
+    await f.close();
+  }
+});
+
+test("PayPal setup status lists missing names without exposing credentials", async () => {
+  const f = await fixture();
+  try {
+    delete process.env.PAYPAL_PARTNER_ATTRIBUTION_ID;
+    const response = await f.seller.request(f.path);
+    assert.equal(response.data.configured, false);
+    assert.deepEqual(response.data.setupMissing, [
+      "PAYPAL_PARTNER_ATTRIBUTION_ID",
+    ]);
+    assert.ok(
+      !JSON.stringify(response.data).includes("controlled-partner-secret"),
+    );
+    assert.ok(
+      !JSON.stringify(response.data).includes("controlled-partner-client"),
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+test("Two connected sandbox sellers keep checkout, capture and refund destinations separate", async () => {
+  const f = await fixture();
+  try {
+    await f.connect();
+    await f.seller.request(f.callback);
+    const first = ready(f);
+    const second = createIncident(f.db, "Second sandbox seller");
+    second.products = structuredClone(first.products);
+    second.pickup = "Second pickup counter";
+    save(f.db, second);
+    publish(f.db, second.id, second.revision);
+    const connections = new Map([
+      [MERCHANT, "first-tracking"],
+      [OTHER, "second-tracking"],
+    ]);
+    for (const [shopId, merchantId, tracking] of [
+      [first.id, MERCHANT, "first-tracking"],
+      [second.id, OTHER, "second-tracking"],
+    ]) {
+      f.db.prepare("INSERT OR REPLACE INTO rc_meta VALUES(?,?)").run(
+        `paypal-connection:${shopId}`,
+        JSON.stringify({
+          state: "connected",
+          merchantId,
+          tracking,
+          generation: shopId,
+          clientId: process.env.PAYPAL_CLIENT_ID,
+          partnerId: PARTNER,
+        }),
+      );
+    }
+    const calls: any[] = [],
+      provider = new Map<string, any>();
+    const transport: typeof paypal = async (
+      path,
+      method = "GET",
+      body: any,
+      key,
+      context,
+    ) => {
+      calls.push({ path, context, body });
+      if (path.includes("merchant-integrations?tracking_id=")) {
+        const tracking = new URL(
+          "https://fixture.invalid" + path,
+        ).searchParams.get("tracking_id");
+        return {
+          tracking_id: tracking,
+          merchant_id: [...connections].find(
+            ([, value]) => value === tracking,
+          )?.[0],
+        };
+      }
+      if (path.includes("merchant-integrations/")) {
+        const merchant = path.split("/").at(-1)!;
+        return {
+          merchant_id: merchant,
+          tracking_id: connections.get(merchant),
+          payments_receivable: true,
+          primary_email_confirmed: true,
+          oauth_integrations: [
+            {
+              oauth_third_party: [
+                {
+                  partner_client_id: process.env.PAYPAL_CLIENT_ID,
+                  scopes: [
+                    "https://uri.paypal.com/services/payments/refund",
+                    "https://uri.paypal.com/services/payments/payment/authcapture",
+                  ],
+                },
+              ],
+            },
+          ],
+        };
+      }
+      if (path === "/v2/checkout/orders") {
+        const id = `ORDER${provider.size + 1}`;
+        const result = {
+          id,
+          status: "APPROVED",
+          purchase_units: body.purchase_units,
+          links: [
+            {
+              rel: "payer-action",
+              href: `https://www.sandbox.paypal.com/checkoutnow?token=${id}`,
+            },
+          ],
+        };
+        provider.set(id, result);
+        return result;
+      }
+      if (path.endsWith("/capture")) {
+        const result = provider.get(path.split("/")[4]);
+        result.status = "COMPLETED";
+        result.purchase_units[0].payments = {
+          captures: [
+            {
+              id: `CAP${result.id}`,
+              status: "COMPLETED",
+              amount: result.purchase_units[0].amount,
+            },
+          ],
+        };
+        return result;
+      }
+      if (path.endsWith("/refund"))
+        return {
+          id: `REF${context!.merchantId}`,
+          status: "COMPLETED",
+          amount: body.amount,
+        };
+      return provider.get(path.split("/").at(-1)!);
+    };
+    const pay = payments(f.db, "http://localhost", transport);
+    for (const [index, shop] of [first, incident(f.db, second.id)].entries()) {
+      const destination = paymentDestination(f.db, shop.id)!;
+      const created = reserve(
+        f.db,
+        shop.id,
+        `buyer-${index}`,
+        `request-for-seller-${index}`,
+        `receipt-${index}`,
+        shop.published!.revision,
+        [{ sku: "MUG", quantity: 1 }],
+        destination,
+      );
+      await pay.ensure(created.id);
+      await pay.reconcile(created.id, true);
+      await pay.refund(created.id);
+      const stored = order(f.db, created.id);
+      assert.equal(stored.merchant, index === 0 ? MERCHANT : OTHER);
+      assert.equal(stored.refunded, 2000);
+      assert.equal(
+        stored.snapshot.paymentDestination.merchantId,
+        stored.merchant,
+      );
+    }
+    for (const merchant of [MERCHANT, OTHER]) {
+      const sellerCalls = calls.filter(
+        (call) => call.context?.merchantId === merchant,
+      );
+      assert.ok(
+        sellerCalls.some(
+          (call) =>
+            call.path === "/v2/checkout/orders" &&
+            call.body.purchase_units[0].payee.merchant_id === merchant,
+        ),
+      );
+      assert.ok(sellerCalls.some((call) => call.path.endsWith("/capture")));
+      assert.ok(sellerCalls.some((call) => call.path.endsWith("/refund")));
+    }
+  } finally {
+    await f.close();
+  }
+});
+
+test("Signature-checked webhook ingress records duplicate protection without repeating money or stock", async () => {
+  const f = await fixture(),
+    originalFetch = globalThis.fetch;
+  try {
+    await f.connect();
+    await f.seller.request(f.callback);
+    const shop = ready(f),
+      pay = payments(f.db, "http://localhost", f.transport);
+    const created = reserve(
+      f.db,
+      shop.id,
+      "webhook-buyer",
+      "webhook-request",
+      "private-receipt",
+      shop.published!.revision,
+      [{ sku: "MUG", quantity: 1 }],
+      paymentDestination(f.db, shop.id),
+    );
+    const o = await pay.ensure(created.id);
+    f.provider.get(o.provider).status = "APPROVED";
+    process.env.PAYPAL_WEBHOOK_ID = "controlled-webhook";
+    const event = {
+      id: "CONTROLLED-WEBHOOK-1",
+      event_type: "CHECKOUT.ORDER.APPROVED",
+      resource: { id: o.provider },
+    };
+    let signatureOk = false;
+    globalThis.fetch = (async (url: any) =>
+      new Response(
+        JSON.stringify(
+          String(url).endsWith("/v1/oauth2/token")
+            ? { access_token: "controlled-token", expires_in: 3600 }
+            : { verification_status: signatureOk ? "SUCCESS" : "FAILURE" },
+        ),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      )) as typeof fetch;
+    await assert.rejects(pay.receive({}, event), /signature/);
+    assert.equal(
+      (f.db.prepare("SELECT count(*) n FROM rc_events").get() as any).n,
+      0,
+    );
+    signatureOk = true;
+    await pay.receive({}, event);
+    await pay.worker();
+    await pay.receive({}, event);
+    await pay.worker();
+    const { paymentHistory } =
+      await import("../server/restorecart/paymentHistory");
+    const history = paymentHistory(f.db, o.id);
+    assert.equal(
+      history.filter((e) => e.kind === "webhook_received").length,
+      1,
+    );
+    assert.equal(
+      history.filter((e) => e.kind === "webhook_processed").length,
+      1,
+    );
+    assert.equal(
+      history.filter((e) => e.kind === "webhook_duplicate_ignored").length,
+      1,
+    );
+    assert.equal(
+      (
+        f.db
+          .prepare("SELECT count(*) n FROM rc_moves WHERE order_id=?")
+          .get(o.id) as any
+      ).n,
+      1,
+    );
+    assert.ok(!JSON.stringify(history).includes("private-receipt"));
+  } finally {
+    globalThis.fetch = originalFetch;
+    await f.close();
+  }
+});
+
+test("PayPal onboarding permission errors explain setup rather than imply a pending payment", async () => {
+  const f = await fixture(),
+    originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = (async (url: any) =>
+      new Response(
+        JSON.stringify(
+          String(url).endsWith("/v1/oauth2/token")
+            ? { access_token: "controlled-token", expires_in: 3600 }
+            : { name: "NOT_AUTHORIZED" },
+        ),
+        {
+          status: String(url).endsWith("/v1/oauth2/token") ? 200 : 403,
+          headers: { "Content-Type": "application/json" },
+        },
+      )) as typeof fetch;
+    await assert.rejects(
+      paypal("/v2/customer/partner-referrals", "POST", {}),
+      (error: any) =>
+        error.providerStatus === 403 &&
+        /sandbox permissions/.test(error.message) &&
+        !/still checking/.test(error.message),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
     await f.close();
   }
 });

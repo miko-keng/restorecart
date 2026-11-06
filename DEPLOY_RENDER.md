@@ -50,3 +50,9 @@ WooCommerce connection saving requires `WOOCOMMERCE_ENCRYPTION_KEY` once for the
 ## Free compute with external persistence (new)
 
 The code now supports a remote Turso/libSQL database without a paid Render disk. Configure `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` and `RESTORECART_REQUIRE_PERSISTENCE=true` privately. See [external storage setup and migration](docs/restorecart/EXTERNAL_STORAGE.md). Do not claim the hosting storage issue is fixed until the external account is configured and a hosted restart has been checked. The default free demo Blueprint keeps persistence optional; setting the guard to true is an explicit deployment step.
+
+## Seller-connected sandbox checkout
+
+Configure `PAYPAL_PARTNER_MERCHANT_ID` and `PAYPAL_PARTNER_ATTRIBUTION_ID` with the corresponding sandbox Platform app credentials. Keep `PAYPAL_REQUIRE_SELLER_CONNECTION=true` and `PAYPAL_ALLOW_SHARED_DEMO=false` for testers. The local private verification environment is not automatically deployed to Render. Sellers authorize their own sandbox business accounts in Settings. Existing shared-account orders keep their original payment context; do not replace credentials on a service with unsettled orders without planning their reconciliation. See [seller setup](docs/restorecart/PAYPAL_SELLER_CONNECTION.md).
+
+The supplied Render blueprint explicitly opts into the configured shared sandbox account for the hackathon demo (`PAYPAL_ALLOW_SHARED_DEMO=true`, `PAYPAL_REQUIRE_SELLER_CONNECTION=false`). Existing Render services may need these settings applied manually; a source push does not prove the running service adopted new environment values. Use the seller-connected values above for individual tester accounts.

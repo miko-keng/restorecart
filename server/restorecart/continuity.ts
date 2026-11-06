@@ -1,3 +1,4 @@
+import { checkoutStatus } from "./paypalConnections";
 import {
   decisionInput,
   recordProductDecision,
@@ -125,6 +126,7 @@ export function readiness(db: DB, id: string) {
     });
   return {
     canPublish: blockers.length === 0,
+    payment: checkoutStatus(db, id),
     blockers,
     rehearsal,
     products,

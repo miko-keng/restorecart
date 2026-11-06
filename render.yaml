@@ -26,6 +26,15 @@ services:
         sync: false
       - key: PAYPAL_WEBHOOK_ID
         sync: false
+      - key: PAYPAL_PARTNER_MERCHANT_ID
+        sync: false
+      - key: PAYPAL_PARTNER_ATTRIBUTION_ID
+        sync: false
+      # Explicit hackathon demo mode. For seller-connected testing, use true/false respectively.
+      - key: PAYPAL_REQUIRE_SELLER_CONNECTION
+        value: "false"
+      - key: PAYPAL_ALLOW_SHARED_DEMO
+        value: "true"
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL

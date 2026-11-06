@@ -1,3 +1,4 @@
+import { checkoutStatus } from "./paypalConnections";
 import { pickupWindow } from "./pickups";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
@@ -292,6 +293,7 @@ export function mountAccounts(
             slug: row.slug,
             name: shop.published.name,
             pickup: shop.published.pickup,
+            payment: checkoutStatus(db, shop.id),
             state: shop.state,
             revision: shop.published.revision,
             requestKey: saved.requestKey,

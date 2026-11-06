@@ -170,6 +170,7 @@ export function Basket(p: Props) {
                     !!p.busy ||
                     !p.ready ||
                     shop.state !== "live" ||
+                    shop.payment?.available === false ||
                     shop.lines.some((l: any) => l.quantity > l.available)
                   }
                   onClick={() =>
@@ -198,6 +199,16 @@ export function Basket(p: Props) {
                 >
                   Checkout with PayPal <ArrowRight size={17} />
                 </button>
+                {shop.payment?.available === false && (
+                  <p className="rc-payment-hint">
+                    This seller needs to connect PayPal before checkout.
+                  </p>
+                )}
+                {shop.payment?.mode === "shared_demo" && (
+                  <p className="rc-payment-hint">
+                    Shared sandbox demo account · test funds only
+                  </p>
+                )}
               </div>
             </footer>
           </motion.section>

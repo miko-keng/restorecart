@@ -535,9 +535,8 @@ export function RecoveryPanel(p: Props) {
     <section className="rc-panel rc-continuity">
       <h2>Return your emergency sales.</h2>
       <p>
-        Supported destination: <b>Original Store JSON v1</b>. This updates a
-        local destination file, not a Shopify/WooCommerce website. Payments are
-        never charged again.
+        Update an <b>Original Store JSON v1</b> file. Payments are never charged
+        again.
       </p>
       <div className="rc-buttonrow">
         <label className="rc-button secondary">
@@ -594,6 +593,11 @@ export function RecoveryPanel(p: Props) {
       </label>
       {!closed && (
         <p>Close new checkouts using the controls above before comparing.</p>
+      )}
+      {closed && !input && (
+        <p className="rc-payment-hint">
+          Upload an export or choose the practice file first.
+        </p>
       )}
       <button
         className="rc-button"
