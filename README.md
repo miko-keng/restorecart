@@ -4,6 +4,16 @@ RestoreCart reconstructs a catalog from surviving records, opens a temporary pic
 
 [Hosted demo](https://restorecart.onrender.com/restorecart) · [Judge access](docs/restorecart/JUDGE_ACCESS.md) · [Three-minute recording guide](DEMO_REHEARSAL_GUIDE.md) · [Submission description](docs/restorecart/SUBMISSION_DESCRIPTION.md) · [Final release status](docs/restorecart/RELEASE_CHECKLIST.md)
 
+## PayPal seller-account limitation — current demo
+
+**In Shared demo mode, every completed sandbox checkout pays ONE configured PayPal sandbox business account, regardless of which RestoreCart seller or shop created the order.** Creating a RestoreCart seller account does not create or connect a separate PayPal account. Payments are not distributed to individual sellers, and this demo does not implement seller payouts. Sandbox transactions use test funds; no real money moves.
+
+The **Connect PayPal** implementation can start a genuine sandbox authorization flow, but individual seller onboarding has **not been verified end to end**. Our attempt reached PayPal’s seller identity-information screen and was stopped without entering real ID details. Do not describe the current demo as verified multi-seller payment routing or production-ready merchant onboarding.
+
+The selected fallback is explicitly labelled **Shared demo** in Settings and in the buyer basket. Seller-connected mode remains a separate configuration that requires verified seller authorization; it must not silently fall back to the shared account. Completing and validating separate seller connections is required before claiming each seller receives payments directly. The local fallback was verified; a source push alone does not prove the hosted service has adopted the same environment settings.
+
+See [seller payment setup and verification limits](docs/restorecart/SELLER_PAYMENTS_UI.md).
+
 ## Reviewer guide: resettable sandbox demo
 
 **The current Render deployment uses temporary local SQLite, by explicit demo scope.** Prepared products and sample statuses can be recreated from code. New accounts, actual orders, stock movements and recovery journals can disappear after a restart, redeploy or spin-down. GitHub does not preserve the running database. Download reports before redeploying; complete purchase and recovery in the same running session.
