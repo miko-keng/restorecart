@@ -1,8 +1,8 @@
+import { SidePanel } from "./SidePanel";
+import { OrdersWorkspace } from "./OrdersWorkspace";
 import { ReopeningChecklist } from "./ReopeningChecklist";
-import { SampleOrderChat } from "./SampleOrderChat";
 import { AiEvaluation } from "./AiEvaluation";
 import { PaymentTimeline } from "./PaymentTimeline";
-import { OperationsChat } from "./OperationsChat";
 import { PayPalConnectionPanel } from "./PayPalConnectionPanel";
 import { DecisionHistory } from "./DecisionHistory";
 import { SupportingRecords } from "./SupportingRecords";
@@ -13,14 +13,9 @@ import {
   productSaveIssues,
 } from "./productReview";
 import { GeminiReview } from "./GeminiReview";
-import { matchesOrderFilter, sampleOrders } from "./orderExamples";
 import { WooCommercePanel } from "./WooCommercePanel";
 import { useProductDraft } from "./useProductDraft";
 import { canRefundOrder } from "./orderStatus";
-import { OrderViewBoundary } from "./OrderViewBoundary";
-import { lazy, Suspense } from "react";
-const OrderTable = lazy(() => import("./OrderTable"));
-const PickupSchedule = lazy(() => import("./PickupSchedule"));
 import { OrderProgress } from "./OrderProgress";
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "motion/react";
@@ -60,15 +55,14 @@ export function SellerWorkspace(p: Props) {
         ? "Settings"
         : "Shop editor",
     ),
-    [orderView, setOrderView] = useState("Orders"),
-    [sampleMode, setSampleMode] = useState(false),
-    [selectedOrder, setSelectedOrder] = useState(""),
     [readiness, setReadiness] = useState<any>(null),
     [mappings, setMappings] = useState<any[]>([]),
     [review, setReview] = useState<any>(null),
     [savedReview, setSavedReview] = useState<any>(null),
     [preview, setPreview] = useState(false),
     [creating, setCreating] = useState(false),
+    [reviewSku, setReviewSku] = useState(""),
+    [aiOpen, setAiOpen] = useState(false),
     [message, setMessage] = useState(""),
     [newName, setNewName] = useState(""),
     [orders, setOrders] = useState<any[]>([]),
@@ -143,12 +137,23 @@ export function SellerWorkspace(p: Props) {
   useEffect(() => {
     setReview(null);
     setSavedReview(null);
+    setReviewSku("");
+    const drafts: Record<string, boolean> = {};
+    if (shop) {
+      for (const product of shop.products || []) {
+        const key = `rc-product:${p.session.user?.id || "seller"}:${shop.id}:${product.sku}`;
+        try {
+          const saved = JSON.parse(sessionStorage.getItem(key) || "null");
+          if (saved?.at > Date.now() - 86400000) drafts[key] = true;
+        } catch {}
+      }
+    }
+    setDirtyForms(drafts);
     setCreating(false);
     setMessage("");
     setReadiness(null);
     setOrders([]);
     setOperationsPlan(null);
-    setSelectedOrder("");
     setFilter("All");
     setContact(null);
   }, [shop?.id]);
@@ -307,8 +312,6 @@ export function SellerWorkspace(p: Props) {
       !["paid", "failed", "canceled"].includes(o.state) ||
       o.refund?.state === "checking",
   );
-  const matches = (o: any) => matchesOrderFilter(o, filter);
-  const visibleOrders = (sampleMode ? sampleOrders : orders).filter(matches);
   return (
     <main className="rc-workspace rc-seller-workspace">
       {shop && (
@@ -357,8 +360,8 @@ export function SellerWorkspace(p: Props) {
         <div className="rc-workspace-heading">
           <div>
             <span className="rc-eyebrow">YOUR SELLER WORKSPACE</span>
-            <h1>Seller workspace</h1>
-            <p>Rebuild your catalog. Keep orders moving.</p>
+            <h1>{section}</h1>
+
             <small>
               {p.session?.storage?.externalConfigured
                 ? "External database configured. Keep recovery reports and verify records after deployment."
@@ -390,98 +393,13 @@ export function SellerWorkspace(p: Props) {
               ))}
             </select>
           </label>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              p.run("Creating shop", async () => {
-                const i = await p.api("/incidents", { name: newName });
-                await p.loadList();
-                await p.load(i.id);
-                setNewName("");
-                setSection("Shop editor");
-              });
-            }}
-          >
-            <label>
-              New shop name
-              <input
-                required
-                value={newName}
-                maxLength={80}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Your business name"
-              />
-            </label>
-            <button className="rc-button secondary" disabled={!!p.busy}>
-              <Plus size={17} />
-              New shop
-            </button>
-          </form>
-        </div>
-        <button
-          className="rc-link"
-          disabled={!!p.busy}
-          onClick={() =>
-            p.run("Preparing demo shop", async () => {
-              const demo = await p.api("/demo/prepare", {});
-              await p.loadList();
-              await p.load(demo.id);
-              setSection("Shop editor");
-            })
-          }
-        >
-          Load prepared Sunday Studio Demo
-        </button>
-        <button
-          className="rc-link"
-          disabled={!!p.busy}
-          onClick={() => {
-            if (
-              dirtyCount &&
-              !window.confirm(
-                "Your unsaved edits will remain in this browser. Open the separate practice draft?",
-              )
-            )
-              return;
-            p.run("Opening conflict practice", async () => {
-              const demo = await p.api("/demo/prepare", { practice: true });
-              await p.loadList();
-              await p.load(demo.id);
-              setSection("Shop editor");
-            });
-          }}
-        >
-          Open conflict practice draft
-        </button>
-        {!shop ? (
-          <section className="rc-panel">
-            <h2>Create your shop to get started.</h2>
-            <p>Then upload records or try the sample files.</p>
-          </section>
-        ) : (
-          <>
-            {dirtyCount > 0 && (
-              <p className="rc-notice" role="status">
-                {dirtyCount} product(s) have unsaved edits. Saving a different
-                product keeps these edits.
-              </p>
-            )}
-            {operations?.ai && (
-              <p role="status">
-                Gemini: {operations.ai.remaining} calls available this window.
-                Allowance renews{" "}
-                {new Date(operations.ai.retryAt).toLocaleString()}. Cached
-                answers use no allowance.
-              </p>
-            )}
-
+          {shop && section === "Shop editor" && (
             <div className="rc-editor-toolbar">
               <span>
-                <b>{shop.name}</b> ·{" "}
                 {shop.state === "live"
                   ? "Published"
                   : shop.state === "draft"
-                    ? "Unpublished draft"
+                    ? "Draft"
                     : "Closed to new orders"}
               </span>
               <div>
@@ -490,7 +408,7 @@ export function SellerWorkspace(p: Props) {
                   onClick={() => setPreview(true)}
                 >
                   <Eye size={16} />
-                  Preview saved draft
+                  Preview
                 </button>
                 {shop.published && (
                   <a
@@ -532,7 +450,7 @@ export function SellerWorkspace(p: Props) {
               </div>
               <p
                 id="rc-publish-status"
-                className="rc-publish-status"
+                className="rc-publish-status rc-sr"
                 role="status"
               >
                 {publishBlockers.length
@@ -540,30 +458,111 @@ export function SellerWorkspace(p: Props) {
                   : "Ready to publish your saved products and shop details."}
               </p>
             </div>
+          )}
+          <details className="rc-shop-tools">
+            <summary>Shop options</summary>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                p.run("Creating shop", async () => {
+                  const i = await p.api("/incidents", { name: newName });
+                  await p.loadList();
+                  await p.load(i.id);
+                  setNewName("");
+                  setSection("Shop editor");
+                });
+              }}
+            >
+              <label>
+                New shop name
+                <input
+                  required
+                  value={newName}
+                  maxLength={80}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Your business name"
+                />
+              </label>
+              <button className="rc-button secondary" disabled={!!p.busy}>
+                <Plus size={17} />
+                New shop
+              </button>
+            </form>
+            <button
+              className="rc-link"
+              disabled={!!p.busy}
+              onClick={() =>
+                p.run("Preparing demo shop", async () => {
+                  const demo = await p.api("/demo/prepare", {});
+                  await p.loadList();
+                  await p.load(demo.id);
+                  setSection("Shop editor");
+                })
+              }
+            >
+              Load prepared Sunday Studio Demo
+            </button>
+            <button
+              className="rc-link"
+              disabled={!!p.busy}
+              onClick={() => {
+                if (
+                  dirtyCount &&
+                  !window.confirm(
+                    "Your unsaved edits will remain in this browser. Open the separate practice draft?",
+                  )
+                )
+                  return;
+                p.run("Opening conflict practice", async () => {
+                  const demo = await p.api("/demo/prepare", { practice: true });
+                  await p.loadList();
+                  await p.load(demo.id);
+                  setSection("Shop editor");
+                });
+              }}
+            >
+              Open conflict practice draft
+            </button>
+          </details>
+        </div>
+        {!shop ? (
+          <section className="rc-panel">
+            <h2>Create your shop to get started.</h2>
+            <p>Then upload records or try the sample files.</p>
+          </section>
+        ) : (
+          <>
+            {dirtyCount > 0 && (
+              <p className="rc-notice" role="status">
+                Unsaved changes · {dirtyCount} product
+                {dirtyCount === 1 ? "" : "s"}
+              </p>
+            )}
+            {section === "Settings" && operations?.ai && (
+              <p role="status">
+                Gemini: {operations.ai.remaining} calls available this window.
+                Allowance renews{" "}
+                {new Date(operations.ai.retryAt).toLocaleString()}. Cached
+                answers use no allowance.
+              </p>
+            )}
+
             {section === "Shop editor" && (
               <ReopeningChecklist
                 readiness={readiness}
                 dirtyCount={dirtyCount}
                 blockers={publishBlockers}
-                onReview={(sku: string) => {
+                onReview={(sku: string) => setReviewSku(sku)}
+                onPayments={() => setSection("Settings")}
+                onPickup={() => {
                   const target = document.getElementById(
-                    `rc-product-${sku}`,
+                    "rc-shop-details",
                   ) as HTMLDetailsElement;
                   if (target) {
                     target.open = true;
-                    target.scrollIntoView({
-                      block: "center",
-                      behavior: "instant",
-                    });
-                    target.querySelector("input")?.focus();
+                    target.scrollIntoView({ block: "center" });
                   }
                 }}
-                onPayments={() => setSection("Settings")}
-                onPickup={() =>
-                  document
-                    .getElementById("rc-shop-details")
-                    ?.scrollIntoView({ block: "center" })
-                }
               />
             )}
             {loadError && (
@@ -589,8 +588,8 @@ export function SellerWorkspace(p: Props) {
             {shop.demoPrepared &&
               !shop.conflictPractice &&
               section === "Shop editor" && (
-                <p className="rc-notice">
-                  Sample records loaded. Review your products, then publish.
+                <p className="rc-sample-notice">
+                  Sample records · Review before publishing.
                 </p>
               )}
             {message && (
@@ -630,7 +629,14 @@ export function SellerWorkspace(p: Props) {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <section className="rc-panel">
+                <details
+                  className="rc-panel rc-files-panel"
+                  open={!shop.sources?.length}
+                >
+                  <summary>
+                    Files · {shop.sources?.length || 0} uploaded{" "}
+                    <span>Add files</span>
+                  </summary>
                   <div className="rc-seller-sectionhead">
                     <div>
                       <span className="rc-eyebrow">1 · IMPORT</span>
@@ -726,22 +732,11 @@ export function SellerWorkspace(p: Props) {
                         />
                       </details>
                     )}
-                </section>
+                </details>
                 <section className="rc-panel">
                   <div className="rc-seller-sectionhead">
                     <div>
-                      <span className="rc-eyebrow">2 · REVIEW</span>
-                      <h2>Check your products.</h2>
-                      <p>
-                        {readiness?.products?.filter(
-                          (r: any) => r.status === "ready",
-                        ).length || 0}{" "}
-                        ready ·{" "}
-                        {readiness?.products?.filter(
-                          (r: any) => r.status === "needs-information",
-                        ).length || 0}{" "}
-                        need attention
-                      </p>
+                      <h2>Products</h2>
                     </div>
                     <div className="rc-gemini-actions">
                       {savedReview && (
@@ -749,20 +744,18 @@ export function SellerWorkspace(p: Props) {
                           className="rc-button secondary"
                           disabled={!!p.busy}
                           onClick={() =>
-                            p.run(
-                              "Showing saved Gemini review — no API call",
-                              async () => {
-                                const saved = await p.api(
-                                  `/incidents/${shop.id}/review-result`,
-                                );
-                                setSavedReview(saved);
-                                setReview(saved);
-                              },
-                            )
+                            p.run("Opening AI review", async () => {
+                              const saved = await p.api(
+                                `/incidents/${shop.id}/review-result`,
+                              );
+                              setSavedReview(saved);
+                              setReview(saved);
+                              setAiOpen(true);
+                            })
                           }
                         >
                           <Sparkles size={16} />
-                          Show saved Gemini review
+                          Open AI review
                         </button>
                       )}
                       <button
@@ -778,91 +771,92 @@ export function SellerWorkspace(p: Props) {
                             );
                             setSavedReview(latest);
                             setReview({ ...latest, saved: false });
+                            setAiOpen(true);
                           })
                         }
                       >
-                        Run a fresh review
+                        Run new review
                       </button>
                     </div>
                   </div>
-                  <p className="rc-review-status" role="status">
-                    {savedReview
-                      ? "Replay the saved review, or request a new one."
-                      : "A fresh review checks saved records for conflicts and suggestions. It does not approve products or confirm physical stock."}
-                  </p>
-                  <AiEvaluation />
-                  {review && <GeminiReview review={review} shop={shop} />}
+                  {aiOpen && review && (
+                    <GeminiReview review={review} shop={shop} />
+                  )}
                   {!shop.products.length && !creating && (
                     <p>
                       Import your records to prepare products, or add one
                       manually.
                     </p>
                   )}
-                  {shop.products.map((product: any) => {
-                    const row = readiness?.products?.find(
-                      (r: any) => r.sku === product.sku,
-                    );
-                    return (
-                      <details
-                        className="rc-seller-product"
-                        id={`rc-product-${product.sku}`}
-                        key={`${shop.id}:${product.sku}`}
-                        open={
-                          row?.status !== "ready" && row?.status !== "excluded"
-                        }
-                      >
-                        <summary>
-                          <span className="rc-product-identity">
-                            <span
-                              className="rc-product-thumbnail"
-                              aria-hidden="true"
-                            >
-                              {product.imageSourceId ? (
-                                <img
-                                  src={`/api/restorecart/sources/${product.imageSourceId}`}
-                                  alt=""
-                                />
-                              ) : (
-                                <Package size={20} />
-                              )}
-                            </span>
-                            <span>
-                              <b>{product.name}</b>
-                              <small>{product.sku}</small>
-                            </span>
+                  <div className="rc-product-list">
+                    {shop.products.map((product: any) => {
+                      const row = readiness?.products?.find(
+                        (r: any) => r.sku === product.sku,
+                      );
+                      return (
+                        <div className="rc-product-list-row" key={product.sku}>
+                          <span className="rc-product-thumbnail">
+                            {product.imageSourceId ? (
+                              <img
+                                src={`/api/restorecart/sources/${product.imageSourceId}`}
+                                alt=""
+                              />
+                            ) : (
+                              <Package size={20} />
+                            )}
+                          </span>
+                          <span>
+                            <strong>{product.name}</strong>
+                            <small>{product.sku}</small>
                           </span>
                           <span>
                             {product.price
                               ? `$${product.price}`
                               : "Price needed"}
                           </span>
-                          <span
-                            className="rc-pill"
-                            data-status={row?.status || "needs-information"}
-                          >
-                            {productStatus(row)}
+                          <span className="rc-pill">
+                            {row?.status === "ready"
+                              ? "Ready"
+                              : row?.status === "excluded"
+                                ? "Hidden"
+                                : "Needs review"}
                           </span>
-                        </summary>
+                          <button
+                            id={`review-product-${product.sku}`}
+                            className="rc-button secondary"
+                            onClick={() => setReviewSku(product.sku)}
+                          >
+                            Review
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <SidePanel
+                    open={!!reviewSku}
+                    onClose={() => setReviewSku("")}
+                    title="Review product"
+                  >
+                    {shop.products
+                      .filter((product: any) => product.sku === reviewSku)
+                      .map((product: any) => (
                         <ProductForm
                           key={`${shop.id}:${product.sku}`}
                           onDirty={onDirty}
                           product={product}
-                          row={row}
+                          row={readiness?.products?.find(
+                            (r: any) => r.sku === product.sku,
+                          )}
                           shop={shop}
-                          review={review}
+                          review={review || savedReview}
                           closed={closed}
                           p={p}
-                          saved={async (notice: string) => {
+                          saved={async () => {
                             await refresh();
-                            setMessage(
-                              notice ||
-                                "Product saved. Check its publishing status below.",
-                            );
                           }}
                         />
-                      </details>
-                    );
-                  })}
+                      ))}
+                  </SidePanel>
                   {creating && (
                     <ProductForm
                       key={`new:${shop.id}`}
@@ -895,242 +889,50 @@ export function SellerWorkspace(p: Props) {
                     {creating ? "Cancel new product" : "Add product manually"}
                   </button>
                 </section>
+                <details className="rc-panel">
+                  <summary>AI test results</summary>
+                  <AiEvaluation />
+                </details>
                 {contact && (
-                  <ShopDetails
-                    key={shop.id}
-                    p={p}
-                    contact={contact}
-                    saved={async () => {
-                      await refresh();
-                      setMessage(
-                        "Shop details saved. Publish to update the public version.",
-                      );
-                    }}
-                  />
+                  <details className="rc-panel" id="rc-shop-details">
+                    <summary>Shop details</summary>
+                    <ShopDetails
+                      key={shop.id}
+                      p={p}
+                      contact={contact}
+                      saved={async () => {
+                        await refresh();
+                        setMessage(
+                          "Shop details saved. Publish to update the public version.",
+                        );
+                      }}
+                    />
+                  </details>
                 )}
               </motion.div>
             )}
             {section === "Orders" && (
-              <section className="rc-panel">
-                <div className="rc-seller-sectionhead">
-                  <div>
-                    <h2>Orders</h2>
-                    {operations?.worker?.pending > 0 && (
-                      <p role="status">
-                        Payment verification{" "}
-                        {operations.worker.delayed
-                          ? "delayed — retrying"
-                          : "in progress"}
-                        . {operations.worker.pending} outcome(s) outstanding.
-                        Use Check PayPal again on an order.
-                      </p>
-                    )}
-                    <details>
-                      <summary>Payment check status</summary>
-                      <p>
-                        Last worker pass:{" "}
-                        {operations?.worker?.completedAt
-                          ? new Date(
-                              operations.worker.completedAt,
-                            ).toLocaleString()
-                          : "Not yet recorded"}{" "}
-                        · Retries for this shop:{" "}
-                        {operations?.worker?.retries || 0}
-                      </p>
-                    </details>
-                    <p>
-                      <b>{shop.name}</b> · Updates every 15 seconds.
-                    </p>
-                    <small>Only this shop’s orders appear here.</small>
-                  </div>
-                  <button
-                    className="rc-button secondary"
-                    disabled={!!p.busy}
-                    onClick={() => p.run("Refreshing orders", refreshOrders)}
-                  >
-                    <RefreshCw size={16} />
-                    Refresh
-                  </button>
-                </div>
-                <div className="rc-order-filters">
-                  {[
-                    "All",
-                    "Payment checking",
-                    "To prepare",
-                    "Ready for pickup",
-                    "Collected",
-                    "Canceled / refunded",
-                  ].map((f) => (
-                    <button
-                      key={f}
-                      className={filter === f ? "active" : ""}
-                      aria-pressed={filter === f}
-                      onClick={() => setFilter(f)}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
-                <div className="rc-order-filters" aria-label="Order data">
-                  {[false, true].map((sample) => (
-                    <button
-                      key={String(sample)}
-                      className={sampleMode === sample ? "active" : ""}
-                      aria-pressed={sampleMode === sample}
-                      onClick={() => {
-                        setSampleMode(sample);
-                        setSelectedOrder("");
-                      }}
-                    >
-                      {sample ? "Sample preview" : "Actual sandbox orders"}
-                    </button>
-                  ))}
-                </div>
-                {sampleMode && (
-                  <p role="status" className="rc-notice">
-                    Sample orders · No payments, stock changes or recovery
-                    records.
-                  </p>
-                )}
-                <div className="rc-order-filters" aria-label="Order display">
-                  {["Orders", "Pickup schedule"].map((v) => (
-                    <button
-                      key={v}
-                      className={orderView === v ? "active" : ""}
-                      aria-pressed={orderView === v}
-                      onClick={() => {
-                        setOrderView(v);
-                        setSelectedOrder("");
-                      }}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                </div>
-                {sampleMode && <SampleOrderChat />}
-                {!sampleMode && (
-                  <OperationsChat
-                    key={shop.id}
-                    shopId={shop.id}
-                    orders={orders}
-                    api={p.api}
-                    onPlan={setOperationsPlan}
-                    onSaved={refreshOrders}
-                    onOpenOrder={(id) => {
-                      setSelectedOrder(id);
-                      setFilter("All");
-                      setOrderView("Details");
-                    }}
+              <OrdersWorkspace
+                key={shop.id}
+                shop={shop}
+                orders={orders}
+                api={p.api}
+                run={p.run}
+                busy={p.busy}
+                refresh={refreshOrders}
+                plan={operationsPlan}
+                onPlan={setOperationsPlan}
+                userId={p.session.user?.id}
+                initialFilter={filter}
+                renderOrder={(o: any) => (
+                  <SellerOrder
+                    order={o}
+                    shop={shop}
+                    p={p}
+                    refreshed={refreshOrders}
                   />
                 )}
-                <OrderViewBoundary
-                  key={`${orderView}:${sampleMode}`}
-                  onFallback={() => setOrderView("Details")}
-                >
-                  {orderView === "Orders" && (
-                    <div className="rc-desktop-orders">
-                      <Suspense fallback={<p>Loading order table…</p>}>
-                        <OrderTable
-                          key={`${shop.id}:${sampleMode}`}
-                          storageKey={`${p.session.user?.id}:${shop.id}:${sampleMode}`}
-                          orders={visibleOrders}
-                          onSelect={setSelectedOrder}
-                          plan={sampleMode ? null : operationsPlan}
-                        />
-                      </Suspense>
-                    </div>
-                  )}
-                  {orderView === "Pickup schedule" && (
-                    <Suspense fallback={<p>Loading pickup schedule…</p>}>
-                      <PickupSchedule
-                        key={`${shop.id}:${sampleMode}`}
-                        orders={visibleOrders}
-                        shopId={shop.id}
-                        api={sampleMode ? undefined : p.api}
-                        onSelect={setSelectedOrder}
-                        onSaved={refreshOrders}
-                      />
-                    </Suspense>
-                  )}
-                </OrderViewBoundary>
-                {!visibleOrders.length ? (
-                  <p>
-                    No orders match “{filter}”.{" "}
-                    <button
-                      className="rc-link"
-                      onClick={() => setFilter("All")}
-                    >
-                      View all orders
-                    </button>
-                    {!sampleMode && (
-                      <>
-                        {" "}
-                        or{" "}
-                        <button
-                          className="rc-link"
-                          onClick={() => setSampleMode(true)}
-                        >
-                          explore sample orders
-                        </button>
-                      </>
-                    )}
-                    .
-                  </p>
-                ) : (
-                  ["Orders", "Details"].includes(orderView) && (
-                    <div className="rc-order-details">
-                      {visibleOrders
-                        .filter(
-                          (o) =>
-                            orderView !== "Details" ||
-                            !selectedOrder ||
-                            o.id === selectedOrder,
-                        )
-                        .map((o) => (
-                          <div
-                            key={`${sampleMode}:${o.id}`}
-                            className={
-                              selectedOrder === o.id || orderView === "Details"
-                                ? "rc-selected-order"
-                                : "rc-mobile-order"
-                            }
-                          >
-                            {selectedOrder === o.id && (
-                              <button
-                                className="rc-link"
-                                onClick={() => {
-                                  setSelectedOrder("");
-                                  if (orderView === "Details")
-                                    setOrderView("Orders");
-                                }}
-                              >
-                                Close order details
-                              </button>
-                            )}
-                            {sampleMode ? (
-                              <article className="rc-panel">
-                                <h3>Sample order · {o.id}</h3>
-                                <p>1 × Blue mug · $20.00</p>
-                                <OrderProgress order={o} />
-                                <small>
-                                  Preview only. To manage a purchase, switch to
-                                  Actual sandbox orders.
-                                </small>
-                              </article>
-                            ) : (
-                              <SellerOrder
-                                order={o}
-                                shop={shop}
-                                p={p}
-                                refreshed={refreshOrders}
-                              />
-                            )}
-                          </div>
-                        ))}
-                    </div>
-                  )
-                )}
-              </section>
+              />
             )}
             {section === "Settings" && (
               <>
@@ -1610,6 +1412,22 @@ function ProductForm({
             />
           </label>
           {findings("price")}
+          {new Set(
+            product.candidates
+              ?.filter((e: any) => e.field === "price")
+              .map((e: any) => e.value),
+          ).size > 1 && (
+            <label>
+              Reason
+              <input
+                required={!fields.excluded}
+                name="resolutionNote"
+                value={fields.resolutionNote}
+                maxLength={1000}
+                onChange={(e) => change("resolutionNote", e.target.value)}
+              />
+            </label>
+          )}
         </div>
         <div className="rc-field-with-findings">
           <label>
@@ -1649,22 +1467,6 @@ function ProductForm({
         </label>
         {findings("description")}
       </div>
-      {new Set(
-        product.candidates
-          ?.filter((e: any) => e.field === "price")
-          .map((e: any) => e.value),
-      ).size > 1 && (
-        <label>
-          Which source confirms the current price?
-          <input
-            required={!fields.excluded}
-            name="resolutionNote"
-            value={fields.resolutionNote}
-            maxLength={1000}
-            onChange={(e) => change("resolutionNote", e.target.value)}
-          />
-        </label>
-      )}
       <h3 className="rc-form-section-title">Stock and allocation</h3>
       <p className="rc-field-help">
         Count what you have, then choose how many units to sell here.
@@ -1775,9 +1577,7 @@ function ShopDetails({ p, contact, saved }: any) {
   return (
     <section className="rc-panel">
       <span className="rc-eyebrow">3 · SHOP DETAILS</span>
-      <h2 id="rc-shop-details" tabIndex={-1}>
-        How customers can reach you.
-      </h2>
+      <h2 tabIndex={-1}>How customers can reach you.</h2>
       <p>
         Enter these details yourself, then publish to update the customer
         version.

@@ -142,7 +142,7 @@ export function OperationsChat({
         className="rc-button secondary"
         onClick={() => setOpen(true)}
       >
-        <MessageCircle size={17} /> Chat with Gemini
+        <MessageCircle size={17} /> Assistant
       </button>
       <dialog
         ref={dialog}

@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Flex, Heading, Text } from "@radix-ui/themes";
+import { Button } from "@radix-ui/themes";
 import { CheckCircle2 } from "lucide-react";
 import { PaymentsUi } from "./PaymentsUi";
 export function ReopeningChecklist({
@@ -17,93 +17,52 @@ export function ReopeningChecklist({
   const ready = !!readiness?.canPublish && !dirtyCount;
   return (
     <PaymentsUi>
-      <Card
-        size="3"
+      <div
         id="rc-reopening-checklist"
-        className="rc-payment-card"
+        className="rc-readiness-summary"
         aria-label="Reopening checklist"
       >
-        <Flex justify="between" align="center" gap="3" wrap="wrap">
-          <Heading as="h3" size="4">
-            Reopening checklist
-          </Heading>
-          <Badge color={ready ? "teal" : "amber"}>
-            {ready
-              ? "Ready"
-              : readiness
-                ? `${products.length} to review`
-                : "Checking…"}
-          </Badge>
-        </Flex>
-        {ready ? (
-          <Text as="p" size="2" mt="3" role="status">
-            <CheckCircle2 size={15} /> Catalog checks passed. Preview, then
-            publish.
-          </Text>
-        ) : (
-          <>
-            {!!dirtyCount && (
-              <p className="rc-payment-hint">
-                Save your unsaved product edits first.
-              </p>
+        <div>
+          <strong>
+            {!readiness
+              ? "Checking readiness…"
+              : products.length
+                ? `${products.length} products need review`
+                : ready
+                  ? "Catalog ready"
+                  : "Finish shop setup"}
+          </strong>
+        </div>
+        {products.length > 0 && (
+          <Button
+            type="button"
+            size="2"
+            onClick={() => onReview(products[0].sku)}
+          >
+            Review next
+          </Button>
+        )}
+        {!products.length && other.length > 0 && (
+          <details>
+            <summary>Shop checks</summary>
+            <ul>
+              {other.map((b: any, i: number) => (
+                <li key={i}>{b.message}</li>
+              ))}
+            </ul>
+            {other.some((b: any) => b.kind === "pickup") && (
+              <button className="rc-link" onClick={onPickup}>
+                Add pickup instructions
+              </button>
             )}
-            {products.map((p: any) => (
-              <div key={p.sku} className="rc-checklist-row">
-                <Flex justify="between" align="center" gap="3">
-                  <Text weight="medium" size="2">
-                    {p.name}
-                  </Text>
-                  <Button
-                    type="button"
-                    size="1"
-                    variant="soft"
-                    onClick={() => onReview(p.sku)}
-                  >
-                    Review {p.name} →
-                  </Button>
-                </Flex>
-                <details className="rc-payment-details">
-                  <summary>
-                    {p.questions.length}{" "}
-                    {p.questions.length === 1 ? "check" : "checks"} to finish
-                  </summary>
-                  <ul>
-                    {p.questions.map((q: string) => (
-                      <li key={q}>{q}</li>
-                    ))}
-                  </ul>
-                </details>
-              </div>
-            ))}
-            {other.length > 0 && (
-              <details className="rc-payment-details" open={!products.length}>
-                <summary>Shop checks</summary>
-                <ul>
-                  {other.map((b: any, i: number) => (
-                    <li key={i}>{b.message}</li>
-                  ))}
-                </ul>
-              </details>
-            )}
-            {readiness?.blockers?.some((b: any) => b.kind === "pickup") && (
-              <Button type="button" variant="soft" mt="3" onClick={onPickup}>
-                Add pickup instructions →
-              </Button>
-            )}
-            {!readiness && <p className="rc-payment-hint">{blockers[0]}</p>}
-          </>
+          </details>
         )}
         {readiness?.payment?.available === false && (
-          <Flex gap="3" align="center" wrap="wrap" mt="3">
-            <Text size="2" color="gray">
-              Connect PayPal to accept payments.
-            </Text>
-            <Button type="button" size="1" variant="soft" onClick={onPayments}>
-              Connect PayPal →
-            </Button>
-          </Flex>
+          <button className="rc-link" onClick={onPayments}>
+            Connect PayPal
+          </button>
         )}
-      </Card>
+      </div>
     </PaymentsUi>
   );
 }

@@ -25,24 +25,21 @@ export function SampleOrderChat() {
         aria-label="Sample order assistant"
       >
         <Heading as="h3" size="4">
-          {valid
-            ? "Saved Gemini demo · Sample orders"
-            : "Preparation demo · Sample orders"}
+          {valid ? "Gemini" : "Demo assistant"}
         </Heading>
+        {valid && <span className="rc-pill">Saved response</span>}
         <p>
-          1 Blue mug · $20 ·{" "}
+          Sample · 1 Blue mug · $20 ·{" "}
           {decision === "approve" ? "Ready for pickup (sample)" : "Preparing"}
         </p>
-        <Text as="p" size="1" color="gray" mt="2" mb="3">
-          Sample only · No payments or inventory changes
-        </Text>
+
         <Button type="button" variant="soft" onClick={() => setShown(true)}>
-          {valid ? "Show saved Gemini chat" : "Show sample walkthrough"}
+          {valid ? "Play demo chat" : "Show sample walkthrough"}
         </Button>
         {shown && (
           <>
             <details className="rc-payment-details">
-              <summary>Saved prompt and model</summary>
+              <summary>Details</summary>
               <p>{fixture.prompt}</p>
               {valid && (
                 <p>
@@ -54,7 +51,7 @@ export function SampleOrderChat() {
             <p>
               <b>
                 {valid
-                  ? "Gemini (saved response)"
+                  ? "Gemini"
                   : "Scripted example — Gemini recording unavailable"}
                 :
               </b>{" "}

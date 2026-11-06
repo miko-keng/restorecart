@@ -8,8 +8,8 @@ import { AiEvaluation } from "../src/restorecart/AiEvaluation";
 
 test("recorded sample chat offers genuine Gemini replay", () => {
   const html = renderToStaticMarkup(createElement(SampleOrderChat));
-  assert.match(html, /Show saved Gemini chat/);
-  assert.match(html, /Saved Gemini demo/);
+  assert.match(html, /Play demo chat/);
+  assert.match(html, /Saved response/);
   assert.match(html, /never affect PayPal/);
 });
 test("payment panel does not turn a pending order into verified capture", () => {
@@ -86,4 +86,45 @@ test("legacy orders have no invented timestamped payment history", () => {
   );
   assert.match(html, /No timestamped payment events recorded/);
   assert.doesNotMatch(html, /<time /);
+});
+
+test("AI provenance has one saved-response badge with metadata in Details", async () => {
+  const { GeminiReview } = await import("../src/restorecart/GeminiReview");
+  const html = renderToStaticMarkup(
+    createElement(GeminiReview, {
+      review: {
+        saved: true,
+        savedDemo: true,
+        model: "controlled-model",
+        generatedAt: "2026-11-06T01:00:00Z",
+        summary: "Two prices disagree.",
+      },
+    }),
+  );
+  assert.equal((html.match(/Saved response/g) || []).length, 1);
+  assert.match(html, /<summary>Details<\/summary>/);
+  assert.doesNotMatch(html, /Saved demo result|Replay the saved review/);
+});
+
+test("Empty orders show a useful empty state without grid totals or publish controls", async () => {
+  const { OrdersWorkspace } =
+    await import("../src/restorecart/OrdersWorkspace");
+  const html = renderToStaticMarkup(
+    createElement(OrdersWorkspace, {
+      shop: { id: "shop", slug: "test", published: {} },
+      orders: [],
+      api: async () => ({}),
+      run: () => {},
+      refresh: () => {},
+      onPlan: () => {},
+      renderOrder: () => null,
+    }),
+  );
+  assert.match(html, /No purchases yet/);
+  assert.match(html, /Open storefront/);
+  assert.match(html, /Try sample orders/);
+  assert.doesNotMatch(
+    html,
+    /Captured \$|Publish shop|View all orders|No Rows To Show/,
+  );
 });

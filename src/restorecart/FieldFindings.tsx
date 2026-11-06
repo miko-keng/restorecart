@@ -40,10 +40,14 @@ export function FieldFindings({
         ) : (
           <div key={`q:${i}`}>
             <strong>
-              ✦ {field === "price" ? "Conflict found" : "Gemini finding"} · Your
-              decision needed
+              {field === "price"
+                ? "Choose the current price"
+                : "Review this detail"}
             </strong>
-            <p>{q.text}</p>
+            {(field !== "price" ||
+              !(product.candidates || []).some(
+                (c: any) => c.field === "price",
+              )) && <p>{q.text}</p>}
             {field === "price" && (
               <ul>
                 {(product.candidates || [])

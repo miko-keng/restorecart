@@ -1,5 +1,5 @@
 import { nextOrderAction, allowedOrderActions } from "./orderAdvice";
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef } from "react";
 import { AgGridReact } from "ag-grid-react";
 import {
   AllCommunityModule,
@@ -7,12 +7,7 @@ import {
   themeQuartz,
   type ColDef,
 } from "ag-grid-community";
-import {
-  matchesOrderView,
-  orderTotals,
-  safeCsvCell,
-  type OrderView,
-} from "./orderOperations";
+import { safeCsvCell } from "./orderOperations";
 import { orderProgress } from "./orderStatus";
 ModuleRegistry.registerModules([AllCommunityModule]);
 export default function OrderTable({
@@ -26,21 +21,10 @@ export default function OrderTable({
   storageKey?: string;
   plan?: any;
 }) {
-  const [search, setSearch] = useState(""),
-    [view, setView] = useState<OrderView>("all"),
-    [totals, setTotals] = useState(orderTotals(orders));
+  const [extraColumns, setExtraColumns] = useState(false);
   const grid = useRef<any>(null),
     restoring = useRef(false);
-  const viewRef = useRef(view);
-  viewRef.current = view;
   const storage = storageKey ? `rc-order-table-v1:${storageKey}` : "";
-  const summarize = (api: any) => {
-    const rows: any[] = [];
-    api.forEachNodeAfterFilterAndSort((n: any) => {
-      if (n.data) rows.push(n.data);
-    });
-    setTotals(orderTotals(rows));
-  };
   const persist = (api: any) => {
     if (!storage || restoring.current) return;
     try {
@@ -49,18 +33,10 @@ export default function OrderTable({
         JSON.stringify({
           columns: api.getColumnState(),
           filters: api.getFilterModel(),
-          search,
-          view,
         }),
       );
     } catch {}
   };
-  useEffect(() => {
-    if (grid.current) {
-      grid.current.onFilterChanged();
-      persist(grid.current);
-    }
-  }, [view, search]);
   const columns = useMemo<ColDef[]>(
     () => [
       {
@@ -112,6 +88,7 @@ export default function OrderTable({
       {
         headerName: "Refunded USD",
         colId: "refunded",
+        hide: true,
         valueGetter: (p) => (p.data?.refunded || 0) / 100,
         filter: "agNumberColumnFilter",
         valueFormatter: (p) => `$${Number(p.value).toFixed(2)}`,
@@ -120,6 +97,7 @@ export default function OrderTable({
       {
         headerName: "Net USD",
         colId: "net",
+        hide: true,
         valueGetter: (p) =>
           (p.data?.state === "paid" && p.data.capture
             ? p.data.amount - p.data.refunded
@@ -131,6 +109,7 @@ export default function OrderTable({
       {
         headerName: "Pickup appointment",
         colId: "pickup",
+        hide: true,
         minWidth: 190,
         valueGetter: (p) =>
           p.data?.pickupWindow
@@ -140,6 +119,7 @@ export default function OrderTable({
       {
         headerName: "Actions",
         colId: "actions",
+        hide: true,
         sortable: false,
         filter: false,
         minWidth: 130,
@@ -158,80 +138,49 @@ export default function OrderTable({
   );
   return (
     <div>
-      <label>
-        Search orders
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Order, item or status"
-        />
-      </label>
-      <div className="rc-buttonrow">
-        <label>
-          Order workspace
-          <select
-            aria-label="Order workspace"
-            value={view}
-            onChange={(e) => setView(e.target.value as OrderView)}
+      <details className="rc-table-options">
+        <summary>Table options</summary>
+        <div className="rc-buttonrow">
+          <button
+            className="rc-link"
+            onClick={() =>
+              grid.current?.exportDataAsCsv({
+                fileName: orders.some((o) => o.sample)
+                  ? "sample-orders.csv"
+                  : "restorecart-orders.csv",
+                processCellCallback: (p: any) => safeCsvCell(p.value),
+              })
+            }
           >
-            <option value="all">All orders</option>
-            <option value="attention">Needs attention</option>
-            <option value="prepare">To prepare</option>
-            <option value="unscheduled">Unscheduled pickups</option>
-          </select>
-        </label>
-        <button
-          type="button"
-          className="rc-button secondary"
-          onClick={() =>
-            grid.current?.exportDataAsCsv({
-              fileName: orders.some((o) => o.sample)
-                ? "sample-orders.csv"
-                : "restorecart-orders.csv",
-              columnKeys: [
-                "id",
-                "items",
-                "status",
-                "amount",
-                "refunded",
-                "net",
-                "pickup",
-                "nextAction",
-              ],
-              exportedRows: "filteredAndSorted",
-              processCellCallback: (p: any) => safeCsvCell(p.value),
-            })
-          }
-        >
-          Export filtered CSV
-        </button>
-        <button
-          type="button"
-          className="rc-link"
-          onClick={() => {
-            setSearch("");
-            setView("all");
-            grid.current?.setFilterModel(null);
-            grid.current?.resetColumnState();
-            if (storage) sessionStorage.removeItem(storage);
-          }}
-        >
-          Reset table view
-        </button>
-      </div>
-      <p role="status">
-        {orders.some((o) => o.sample)
-          ? "Sample preview — illustrative totals"
-          : "Actual orders — verified capture totals"}
-        : {totals.count} shown · Captured ${(totals.captured / 100).toFixed(2)}{" "}
-        · Refunded ${(totals.refunded / 100).toFixed(2)} · Net $
-        {(totals.net / 100).toFixed(2)}
-      </p>
-      <p>
-        Sort a column or use its filter to find orders. Open an order for pickup
-        and payment actions.
-      </p>
+            Export CSV
+          </button>
+          <button
+            className="rc-link"
+            onClick={() => {
+              grid.current?.setFilterModel(null);
+              grid.current?.resetColumnState();
+              setExtraColumns(false);
+              if (storage) sessionStorage.removeItem(storage);
+            }}
+          >
+            Reset table
+          </button>
+          <label>
+            <input
+              type="checkbox"
+              checked={extraColumns}
+              onChange={(e) => {
+                setExtraColumns(e.target.checked);
+                grid.current?.setColumnsVisible(
+                  ["refunded", "net", "pickup"],
+                  e.target.checked,
+                );
+              }}
+            />{" "}
+            Financial and pickup columns
+          </label>
+        </div>
+      </details>
       <div style={{ height: 390, width: "100%" }}>
         <AgGridReact
           theme={themeQuartz}
@@ -251,37 +200,34 @@ export default function OrderTable({
                       applyOrder: true,
                     });
                   if (saved.filters) api.setFilterModel(saved.filters);
-                  if (typeof saved.search === "string")
-                    setSearch(saved.search.slice(0, 200));
-                  if (
-                    ["all", "attention", "prepare", "unscheduled"].includes(
-                      saved.view,
-                    )
-                  )
-                    setView(saved.view);
+                  setExtraColumns(
+                    api
+                      .getColumnState()
+                      .some(
+                        (c: any) =>
+                          ["refunded", "net", "pickup"].includes(c.colId) &&
+                          !c.hide,
+                      ),
+                  );
                 }
               } catch {}
             restoring.current = false;
-            summarize(api);
           }}
-          isExternalFilterPresent={() => viewRef.current !== "all"}
-          doesExternalFilterPass={(node) =>
-            matchesOrderView(node.data, viewRef.current)
-          }
           onFilterChanged={({ api }) => {
-            summarize(api);
             persist(api);
           }}
           onSortChanged={({ api }) => {
-            summarize(api);
             persist(api);
           }}
           onColumnMoved={({ api }) => persist(api)}
           onColumnResized={(e) => {
             if (e.finished) persist(e.api);
           }}
-          onRowDataUpdated={({ api }) => summarize(api)}
           onRowClicked={(event) => event.data && onSelect(event.data.id)}
+          onCellKeyDown={(event) => {
+            if ((event.event as KeyboardEvent)?.key === "Enter" && event.data)
+              onSelect(event.data.id);
+          }}
           columnDefs={columns}
           defaultColDef={{
             sortable: true,
@@ -289,7 +235,6 @@ export default function OrderTable({
             resizable: true,
             flex: 1,
           }}
-          quickFilterText={search}
           pagination
           paginationPageSize={20}
           paginationPageSizeSelector={[10, 20, 50]}

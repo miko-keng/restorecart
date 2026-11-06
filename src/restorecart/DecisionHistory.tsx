@@ -33,7 +33,7 @@ export function DecisionHistory({
       className="rc-decision-history"
       onToggle={(e) => setOpen(e.currentTarget.open)}
     >
-      <summary>Evidence → seller decision → published details</summary>
+      <summary>Evidence & history</summary>
       {product && (
         <>
           <h4>Source evidence</h4>
@@ -90,7 +90,7 @@ export function DecisionHistory({
               Recheck the product before publishing.
             </p>
           )}
-          <h4>Saved seller decision</h4>
+          <h4>Your decision</h4>
           <p>
             {product.resolved
               ? "Seller confirmed"
@@ -118,7 +118,7 @@ export function DecisionHistory({
             )}
         </>
       )}
-      <h4>Saved decision history</h4>
+      <h4>History</h4>
       {error && <p role="alert">{error}</p>}
       {!rows && !error && <p>Loading history…</p>}
       {rows?.length === 0 && (

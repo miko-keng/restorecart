@@ -36,7 +36,7 @@ export function useProductDraft(
         );
       else sessionStorage.removeItem(key);
     } catch {}
-    return () => onDirty?.(key, false);
+    // Keep the unsaved marker when the review panel closes; the draft persists.
   }, [key, state]);
   return {
     fields: state.fields,

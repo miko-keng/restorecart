@@ -33,3 +33,13 @@ Visual inspection confirmed the three-section editor, removal of buyer navigatio
 ## Explicitly pending
 
 The requested full browser E2E campaign, end-to-end live AI/payment/fulfillment/recovery rehearsal, and final three-minute action/speech/input/file demonstration plan are intentionally deferred to the user's next request. This implementation report does not claim those have already passed. No deployment or GitHub push was performed. Local server remains on port 4370.
+
+## Focused editor and Orders update — 7 November 2026
+
+The editor now combines the shop selector, draft status, Preview and Publish in one compact header. Shop options holds demo and shop-creation controls. Readiness shows one product count and Review next. Products start as compact rows and open individually in a Radix side panel; current price evidence and Reason sit beside the price field. Evidence & history, loaded Files, Shop details and AI test results start collapsed. AI provenance uses one Saved response badge with model and generation information under Details.
+
+Orders has Sandbox orders and Sample orders, a unified search/status/view/assistant toolbar, five primary table columns and optional financial/pickup columns under Table options. Order details and the sample assistant open in side panels. Empty shops show No purchases yet; filtered empty results offer Clear filters. Narrow screens show order cards. Publishing controls appear only in the editor. Sample data remains local and isolated from actual payments, inventory and recovery reports.
+
+Closing a product panel preserves its local unsaved draft and keeps publication blocked. Reopening restores the edit; Discard edits restores the saved product. Existing drafts are checked on shop load so closed panels do not hide pending edits. No server payment or catalog validation was relaxed.
+
+Validation: 200 automated tests passed, including payment/webhook integration tests, saved-provenance rendering and the new Orders empty state. Type checking and the production build passed. Browser checks covered compact editor/product review, edit-close-reopen-discard, sample modes, status/search filters, empty results, order details, sample assistant replay/Approve/Reject, read-only pickup schedule and 390px mobile order cards without horizontal overflow. Tests used an isolated local demo database. This UI validation made no new Gemini request and performed no new PayPal transaction or merchant authorization. The recorded submission guide was updated to the new labels and drawer steps.
