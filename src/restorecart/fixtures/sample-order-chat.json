@@ -1,0 +1,28 @@
+{
+  "order": {
+    "id": "sample-order-2",
+    "product": "Blue mug",
+    "quantity": 1,
+    "amount": 2000,
+    "currency": "USD",
+    "status": "Preparing"
+  },
+  "prompt": "Review this sample order and recommend the next preparation step. Do not claim a real payment or change inventory. Keep your answer to two sentences.",
+  "recording": {
+    "source": "gemini",
+    "model": "gemini-3.5-flash-lite",
+    "generatedAt": "2026-11-06T09:58:54.908Z",
+    "text": "Since the order status is currently \"Preparing,\" the next step is to carefully inspect the Blue mug for any defects before packaging. Once quality control is passed, proceed to securely box the item with appropriate protective wrapping for shipping.",
+    "input": {
+      "order": {
+        "id": "sample-order-2",
+        "product": "Blue mug",
+        "quantity": 1,
+        "amount": 2000,
+        "currency": "USD",
+        "status": "Preparing"
+      },
+      "prompt": "Review this sample order and recommend the next preparation step. Do not claim a real payment or change inventory. Keep your answer to two sentences."
+    }
+  }
+}

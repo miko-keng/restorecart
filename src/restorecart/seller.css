@@ -461,3 +461,30 @@
 .rc-supporting-records {
   margin: 18px 0;
 }
+
+/* Multi-paragraph demos and disclosures must not inherit notice-bar flex layout. */
+.rc-notice.rc-demo-panel {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+.rc-demo-panel > * + * {
+  margin-top: 12px;
+}
+.rc-demo-panel table {
+  width: 100%;
+  text-align: left;
+  border-collapse: collapse;
+}
+.rc-demo-panel th,
+.rc-demo-panel td {
+  padding: 8px;
+  border-bottom: 1px solid #c9d7b7;
+}
+@media (max-width: 700px) {
+  .rc-notice.rc-demo-panel {
+    width: auto;
+  }
+}

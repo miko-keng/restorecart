@@ -1,3 +1,6 @@
+import { SampleOrderChat } from "./SampleOrderChat";
+import { AiEvaluation } from "./AiEvaluation";
+import { PaymentTimeline } from "./PaymentTimeline";
 import { OperationsChat } from "./OperationsChat";
 import { PayPalConnectionPanel } from "./PayPalConnectionPanel";
 import { DecisionHistory } from "./DecisionHistory";
@@ -827,6 +830,7 @@ export function SellerWorkspace(p: Props) {
                       ? "A saved Gemini answer is available. Show it without using tokens, or optionally request a fresh review of saved records."
                       : "A fresh review checks saved records for conflicts and suggestions. It does not approve products or confirm physical stock."}
                   </p>
+                  <AiEvaluation />
                   {review && <GeminiReview review={review} shop={shop} />}
                   {!shop.products.length && !creating && (
                     <p>
@@ -1047,6 +1051,7 @@ export function SellerWorkspace(p: Props) {
                     </button>
                   ))}
                 </div>
+                {sampleMode && <SampleOrderChat />}
                 {!sampleMode && (
                   <OperationsChat
                     key={shop.id}
@@ -1915,6 +1920,7 @@ function SellerOrder({ order: o, shop, p, refreshed }: any) {
   const blocked = o.refund?.state === "checking";
   return (
     <article className="rc-order">
+      <PaymentTimeline order={o} />
       <div className="rc-orderhead">
         <h3>{money(o.amount)}</h3>
         <b>{o.state.replaceAll("_", " ")}</b>

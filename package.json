@@ -22,7 +22,8 @@
     "test:restorecart:live-ai": "node --env-file-if-exists=.env --import tsx scripts/restorecart-live-check.ts",
     "restorecart:demo-accounts": "node --env-file-if-exists=.env --import tsx scripts/restorecart-demo-accounts.ts",
     "restorecart:storage:migrate": "node --env-file-if-exists=.env --import tsx scripts/restorecart-migrate-storage.ts",
-    "test:ai-evals": "NODE_ENV=test node --import tsx --test --test-name-pattern=AI-E0 tests/restorecart-strengthening.test.ts"
+    "test:ai-evals": "NODE_ENV=test node --import tsx --test --test-name-pattern=AI-E0 tests/restorecart-strengthening.test.ts",
+    "restorecart:record-sample-chat": "node --env-file-if-exists=.env --import tsx scripts/record-sample-order-chat.ts"
   },
   "dependencies": {
     "@bryntum/schedulerpro": "npm:@bryntum/schedulerpro-trial@7.3.7",
