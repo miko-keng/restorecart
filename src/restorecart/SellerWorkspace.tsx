@@ -67,7 +67,6 @@ export function SellerWorkspace(p: Props) {
     [review, setReview] = useState<any>(null),
     [savedReview, setSavedReview] = useState<any>(null),
     [preview, setPreview] = useState(false),
-    [publishChecklist, setPublishChecklist] = useState(false),
     [creating, setCreating] = useState(false),
     [message, setMessage] = useState(""),
     [newName, setNewName] = useState(""),
@@ -295,29 +294,13 @@ export function SellerWorkspace(p: Props) {
       previous?.focus();
     };
   }, [preview]);
-  const publishBlockers: string[] = [];
-  if (closed) publishBlockers.push("This shop is closed to new orders.");
-  if (shop?.rehearsal)
-    publishBlockers.push("Practice mode cannot publish or take payments.");
-  if (shop && !readiness) publishBlockers.push("Checking product readiness…");
-  if (readiness && !readiness.products?.some((r: any) => r.status === "ready"))
-    publishBlockers.push("Confirm at least one product and set aside stock.");
+  const publishBlockers: string[] =
+    readiness?.blockers?.map((b: any) => b.message) ||
+    (shop ? ["Checking product readiness…"] : []);
   const incomplete =
     readiness?.products?.filter((r: any) => r.status === "needs-information") ||
     [];
-  if (incomplete.length)
-    publishBlockers.push(
-      ...incomplete.map(
-        (r: any) =>
-          `${r.name}: ${productStatus(r)}. Open the product to finish its review, or hide it from this shop.`,
-      ),
-    );
-  if (shop && !shop.pickup?.trim())
-    publishBlockers.push("Save pickup instructions in Shop details below.");
-  useEffect(() => {
-    if (publishChecklist && publishBlockers.length === 0 && dirtyCount === 0)
-      setPublishChecklist(false);
-  }, [publishChecklist, publishBlockers.length, dirtyCount]);
+
   const pending = orders.filter(
     (o) =>
       !["paid", "failed", "canceled"].includes(o.state) ||
@@ -524,7 +507,12 @@ export function SellerWorkspace(p: Props) {
                   aria-describedby="rc-publish-status"
                   onClick={() => {
                     if (publishBlockers.length || dirtyCount) {
-                      setPublishChecklist(true);
+                      setSection("Shop editor");
+                      requestAnimationFrame(() =>
+                        document
+                          .getElementById("rc-reopening-checklist")
+                          ?.scrollIntoView({ block: "center" }),
+                      );
                       return;
                     }
                     p.run("Publishing shop", async () => {
@@ -547,15 +535,19 @@ export function SellerWorkspace(p: Props) {
                 role="status"
               >
                 {publishBlockers.length
-                  ? publishBlockers.join(" ")
+                  ? `Finish the reopening checklist (${publishBlockers.length} remaining checks).`
                   : "Ready to publish your saved products and shop details."}
               </p>
             </div>
-            {publishChecklist && (
-              <section className="rc-panel" aria-label="Publishing checklist">
-                <h3>Finish preparing your shop</h3>
+            {section === "Shop editor" && (
+              <section
+                className="rc-panel"
+                id="rc-reopening-checklist"
+                aria-label="Reopening checklist"
+              >
+                <h3>Reopening checklist</h3>
                 <p>
-                  Nothing has been published. Resolve these items or hide
+                  Based on saved server checks. Resolve these items or hide
                   products you do not want to sell.
                 </p>
                 {dirtyCount > 0 && (
@@ -572,35 +564,55 @@ export function SellerWorkspace(p: Props) {
                     <p key={i}>{issue}</p>
                   ))}
                 {incomplete.map((r: any) => (
+                  <div key={r.sku}>
+                    <strong>{r.name}</strong>
+                    <ul>
+                      {r.questions.map((question: string) => (
+                        <li key={question}>{question}</li>
+                      ))}
+                    </ul>
+                    <button
+                      className="rc-link"
+                      key={r.sku}
+                      onClick={() => {
+                        setSection("Shop editor");
+                        requestAnimationFrame(() => {
+                          const target = document.getElementById(
+                            `rc-product-${r.sku}`,
+                          ) as HTMLDetailsElement;
+                          if (target) {
+                            target.open = true;
+                            target.scrollIntoView({
+                              block: "center",
+                              behavior: "instant",
+                            });
+                            target.querySelector("input")?.focus();
+                          }
+                        });
+                      }}
+                    >
+                      Review {r.name} →
+                    </button>
+                  </div>
+                ))}
+                {!publishBlockers.length && !dirtyCount && (
+                  <p role="status">
+                    All checks passed. Preview your saved shop, then publish
+                    when ready.
+                  </p>
+                )}
+                {readiness?.blockers?.some((b: any) => b.kind === "pickup") && (
                   <button
                     className="rc-link"
-                    key={r.sku}
-                    onClick={() => {
-                      setSection("Shop editor");
-                      requestAnimationFrame(() => {
-                        const target = document.getElementById(
-                          `rc-product-${r.sku}`,
-                        ) as HTMLDetailsElement;
-                        if (target) {
-                          target.open = true;
-                          target.scrollIntoView({
-                            block: "center",
-                            behavior: "instant",
-                          });
-                          target.querySelector("input")?.focus();
-                        }
-                      });
-                    }}
+                    onClick={() =>
+                      document
+                        .getElementById("rc-shop-details")
+                        ?.scrollIntoView({ block: "center" })
+                    }
                   >
-                    Review {r.name} · {productStatus(r)} →
+                    Add pickup instructions →
                   </button>
-                ))}
-                <button
-                  className="rc-link"
-                  onClick={() => setPublishChecklist(false)}
-                >
-                  Close checklist
-                </button>
+                )}
               </section>
             )}
             {loadError && (
@@ -1576,6 +1588,12 @@ function ProductForm({
         sku={product.sku}
         revision={shop.revision}
         api={p.api}
+        product={product}
+        sources={shop.sources}
+        published={shop.published?.products?.find(
+          (p: any) => p.sku === product.sku,
+        )}
+        changedSources={row?.changedSources}
       />
       {saveNotice && (
         <p className="rc-notice" role="status" aria-live="polite">
@@ -1803,7 +1821,9 @@ function ShopDetails({ p, contact, saved }: any) {
   return (
     <section className="rc-panel">
       <span className="rc-eyebrow">3 · SHOP DETAILS</span>
-      <h2>How customers can reach you.</h2>
+      <h2 id="rc-shop-details" tabIndex={-1}>
+        How customers can reach you.
+      </h2>
       <p>
         Enter these details yourself, then publish to update the customer
         version.

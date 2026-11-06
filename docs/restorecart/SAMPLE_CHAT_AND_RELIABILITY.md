@@ -31,3 +31,5 @@ Tested against an isolated local SQLite workspace, without loading production cr
 - Visual inspection caught inherited notice-bar flex styling; corrected the multi-paragraph panels to block layout and verified the conversation was readable.
 
 The browser run covered the changed sample and evaluation journey. Payment state disclosures were checked by automated component tests; no new PayPal transaction, webhook delivery or merchant onboarding was claimed by this run.
+
+Follow-up: timestamped payment observations, preserved evidence decisions and shared server reopening checks are now implemented. See [Reliability workflows](RELIABILITY_WORKFLOWS.md) for current behavior and validation.

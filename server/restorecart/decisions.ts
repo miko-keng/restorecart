@@ -103,6 +103,14 @@ export function recordProductDecision(
     actor,
     Date.now(),
     JSON.stringify({
+      evidence: structuredClone(after.candidates || []),
+      approvedProduct: {
+        name: after.name,
+        price: after.price,
+        currency: after.currency,
+        resolutionNote: after.resolutionNote,
+        resolved: after.resolved,
+      },
       action: input.action,
       changes,
       decisions,
@@ -124,4 +132,19 @@ export function decisionHistory(db: DB, shopId: string, sku: string) {
       at: new Date(r.created).toISOString(),
       ...JSON.parse(r.body),
     }));
+}
+
+// A prior approval cannot silently survive replacement or removal of its evidence.
+export function changedDecisionSources(db: DB, shopId: string, sku: string) {
+  const latest = decisionHistory(db, shopId, sku).find(
+    (r: any) => r.action === "ready",
+  );
+  if (!latest) return [];
+  const current = sourceList(db, shopId);
+  return (latest.sources || [])
+    .filter(
+      (saved: any) =>
+        !current.some((s) => s.id === saved.id && s.hash === saved.hash),
+    )
+    .map((s: any) => s.name);
 }

@@ -2585,3 +2585,92 @@ test("Agent history and operations endpoints enforce seller ownership and CSRF w
     await f.close();
   }
 });
+
+test("Reopening checklist agrees with publish and invalidates replaced source evidence while preserving the original decision", async () => {
+  const f = await fixture();
+  try {
+    const empty = (await f.seller.request(`/incidents/${f.id}/readiness`)).data;
+    assert.equal(empty.canPublish, false);
+    assert.ok(empty.blockers.some((b: any) => b.kind === "pickup"));
+    assert.equal(
+      (await f.seller.request(`/incidents/${f.id}/publish`, { revision: 0 }))
+        .status,
+      409,
+    );
+    await prepare(f);
+    let shop = incident(f.db, f.id);
+    const product = shop.products.find((p) => p.sku === "MUG-BLU")!;
+    const body = {
+      revision: shop.revision,
+      action: "ready",
+      sku: product.sku,
+      name: product.name,
+      description: product.description,
+      price: "20.00",
+      quantity: 8,
+      allocation: product.allocation,
+      excluded: false,
+      confirm: true,
+      resolutionNote: "Current stock sheet checked",
+      imageSourceId: "",
+    };
+    assert.equal(
+      (await f.seller.request(`/incidents/${f.id}/editor-product`, body))
+        .status,
+      200,
+    );
+    const before = (
+      await f.seller.request(`/incidents/${f.id}/decision-history?sku=MUG-BLU`)
+    ).data[0];
+    assert.ok(before.evidence.length);
+    assert.equal(before.approvedProduct.price, "20.00");
+    assert.equal(
+      (await f.seller.request(`/incidents/${f.id}/readiness`)).data.canPublish,
+      true,
+    );
+    f.db
+      .prepare("UPDATE rc_sources SET hash=? WHERE id=?")
+      .run("replacement-hash", before.sources[0].id);
+    const changed = (await f.seller.request(`/incidents/${f.id}/readiness`))
+      .data;
+    assert.equal(changed.canPublish, false);
+    assert.ok(
+      changed.blockers.some(
+        (b: any) =>
+          b.sku === "MUG-BLU" && /changed or missing evidence/.test(b.message),
+      ),
+    );
+    shop = incident(f.db, f.id);
+    assert.equal(
+      (
+        await f.seller.request(`/incidents/${f.id}/publish`, {
+          revision: shop.revision,
+        })
+      ).status,
+      409,
+    );
+    const history = (
+      await f.seller.request(`/incidents/${f.id}/decision-history?sku=MUG-BLU`)
+    ).data;
+    assert.deepEqual(history[0], before);
+    assert.equal(
+      (await f.stranger.request(`/incidents/${f.id}/readiness`)).status,
+      403,
+    );
+    assert.equal(
+      (
+        await f.seller.request(`/incidents/${f.id}/editor-product`, {
+          ...body,
+          revision: shop.revision,
+        })
+      ).status,
+      200,
+    );
+    assert.equal(
+      (await f.seller.request(`/incidents/${f.id}/readiness`)).data.canPublish,
+      true,
+    );
+  } finally {
+    await f.close();
+  }
+});

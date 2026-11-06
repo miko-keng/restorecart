@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
-export function DecisionHistory({ shopId, sku, revision, api }: any) {
+export function DecisionHistory({
+  shopId,
+  sku,
+  revision,
+  api,
+  product,
+  sources = [],
+  published,
+  changedSources = [],
+}: any) {
   const [open, setOpen] = useState(false),
     [rows, setRows] = useState<any[] | null>(null),
     [error, setError] = useState("");
@@ -24,7 +33,92 @@ export function DecisionHistory({ shopId, sku, revision, api }: any) {
       className="rc-decision-history"
       onToggle={(e) => setOpen(e.currentTarget.open)}
     >
-      <summary>Seller decision history</summary>
+      <summary>Evidence → seller decision → published details</summary>
+      {product && (
+        <>
+          <h4>Source evidence</h4>
+          {new Set(
+            product.candidates
+              ?.filter((c: any) => c.field === "price")
+              .map((c: any) => c.value),
+          ).size > 1 && (
+            <p>
+              Source prices conflict. The seller must choose the current price
+              and explain why.
+            </p>
+          )}
+          {!product.candidates?.length && (
+            <p>
+              No source claims recorded. These details require seller
+              confirmation.
+            </p>
+          )}
+          <ul>
+            {product.candidates
+              ?.filter((c: any) => c.field === "price")
+              .map((c: any, index: number) => (
+                <li key={index}>
+                  <b>
+                    {c.field}: {c.value}
+                  </b>{" "}
+                  ·{" "}
+                  {sources.find((s: any) => s.id === c.sourceId)?.name ||
+                    "Source unavailable"}{" "}
+                  · {c.location}
+                  <blockquote>{c.excerpt}</blockquote>
+                </li>
+              ))}
+          </ul>
+          <details>
+            <summary>Other source claims</summary>
+            <ul>
+              {product.candidates
+                ?.filter((c: any) => c.field !== "price")
+                .map((c: any, index: number) => (
+                  <li key={index}>
+                    {c.field}: {c.value} ·{" "}
+                    {sources.find((s: any) => s.id === c.sourceId)?.name ||
+                      "Source unavailable"}
+                    <blockquote>{c.excerpt}</blockquote>
+                  </li>
+                ))}
+            </ul>
+          </details>
+          {!!changedSources.length && (
+            <p role="alert">
+              Evidence changed or is missing: {changedSources.join(", ")}.
+              Recheck the product before publishing.
+            </p>
+          )}
+          <h4>Saved seller decision</h4>
+          <p>
+            {product.resolved
+              ? "Seller confirmed"
+              : "Awaiting seller confirmation"}{" "}
+            ·{" "}
+            {product.price
+              ? `${product.currency} ${product.price}`
+              : "Price unresolved"}
+          </p>
+          <p>{product.resolutionNote || "No source explanation saved."}</p>
+          <h4>Published details</h4>
+          <p>
+            {published
+              ? `${published.name} · ${published.currency} ${published.price}`
+              : "This product is not in the published shop."}
+          </p>
+          {published &&
+            (published.price !== product.price ||
+              published.name !== product.name ||
+              !product.resolved) && (
+              <p>
+                Saved draft differs or needs review. Customers still see the
+                published version above.
+              </p>
+            )}
+        </>
+      )}
+      <h4>Saved decision history</h4>
       {error && <p role="alert">{error}</p>}
       {!rows && !error && <p>Loading history…</p>}
       {rows?.length === 0 && (
@@ -50,7 +144,30 @@ export function DecisionHistory({ shopId, sku, revision, api }: any) {
                   </p>
                 ))}
                 <details>
-                  <summary>Changes and supporting sources</summary>
+                  <summary>Changes and original supporting evidence</summary>
+                  {r.approvedProduct && (
+                    <p>
+                      Saved result: {r.approvedProduct.name} ·{" "}
+                      {r.approvedProduct.currency} {r.approvedProduct.price}.{" "}
+                      {r.approvedProduct.resolutionNote}
+                    </p>
+                  )}
+                  {r.evidence ? (
+                    <ul>
+                      {r.evidence.map((c: any, index: number) => (
+                        <li key={index}>
+                          {c.field}: {c.value} ·{" "}
+                          {r.sources.find(
+                            (source: any) => source.id === c.sourceId,
+                          )?.name || "Source unavailable"}{" "}
+                          · {c.location}
+                          <blockquote>{c.excerpt}</blockquote>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>This older decision has no saved claim snapshot.</p>
+                  )}
                   <ul>
                     {r.changes.map((c: any, i: number) => (
                       <li key={i}>

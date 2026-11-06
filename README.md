@@ -300,3 +300,7 @@ Final verification and submission handoff: [test evidence](docs/restorecart/FINA
 The card changes to **Connected** only after a successful connection check. Recovery preview and confirmed return are separate actions. The server needs `WOOCOMMERCE_ENCRYPTION_KEY` configured privately once; this key is not included in GitHub. No per-store operator approval is required.
 
 ![WooCommerce connection card](tests/evidence/restorecart-woo-simple.png)
+
+### Payment history and reopening checks
+
+Actual order details show timestamped PayPal observations and their API, reconciliation or webhook origin. Product review connects source evidence to saved seller decisions and published values. The reopening checklist uses the same blockers enforced by the publish endpoint, including changed source evidence. See [reliability workflows](docs/restorecart/RELIABILITY_WORKFLOWS.md).

@@ -1,3 +1,4 @@
+import { paymentHistory } from "./paymentHistory";
 import { AGENT_ROLES } from "./agentRuntime";
 import { reconstructWithAgents, agentProgress } from "./agentCoordinator";
 import { planOperations, decideOperation } from "./operationsAgent";
@@ -223,6 +224,7 @@ export function createApp(
       refunded: o.refunded,
       provider: o.provider,
       capture: o.capture,
+      paymentHistory: paymentHistory(db, o.id),
       expires: o.expires,
       snapshot: o.snapshot,
       receiptUrl: `/restorecart/receipt/${o.id}?access=${o.token}`,
@@ -479,11 +481,8 @@ export function createApp(
           409,
         );
       const checks = readiness(db, parseId(req));
-      if (checks.needsInformation)
-        fail(
-          "Answer the recovery questions and confirm physical stock for every included product before publishing.",
-          409,
-        );
+      if (!checks.canPublish)
+        fail(checks.blockers.map((b) => b.message).join(" "), 409);
       publish(
         db,
         parseId(req),

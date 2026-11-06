@@ -1,3 +1,4 @@
+import { paymentEvent, type PaymentSource } from "./paymentHistory";
 import { remoteDatabase } from "./remoteDatabase";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, chmodSync } from "node:fs";
@@ -35,6 +36,8 @@ export function openRC(
     CREATE TABLE IF NOT EXISTS rc_orders(id TEXT PRIMARY KEY,incident TEXT NOT NULL,buyer TEXT NOT NULL,request_key TEXT NOT NULL,token TEXT NOT NULL,state TEXT NOT NULL,fulfillment TEXT NOT NULL,provider TEXT UNIQUE,merchant TEXT NOT NULL DEFAULT '',capture TEXT UNIQUE,amount INTEGER NOT NULL,refunded INTEGER NOT NULL DEFAULT 0,expires INTEGER NOT NULL,body TEXT NOT NULL,UNIQUE(buyer,request_key));
     CREATE TABLE IF NOT EXISTS rc_holds(order_id TEXT NOT NULL,sku TEXT NOT NULL,units INTEGER NOT NULL CHECK(units>0),state TEXT NOT NULL,PRIMARY KEY(order_id,sku));
     CREATE TABLE IF NOT EXISTS rc_moves(event_key TEXT PRIMARY KEY,incident TEXT NOT NULL,sku TEXT NOT NULL,units INTEGER NOT NULL,kind TEXT NOT NULL,order_id TEXT);
+    CREATE TABLE IF NOT EXISTS rc_payment_history(id TEXT PRIMARY KEY,order_id TEXT NOT NULL,event_key TEXT NOT NULL,kind TEXT NOT NULL,source TEXT NOT NULL,reference TEXT NOT NULL,created INTEGER NOT NULL,UNIQUE(order_id,event_key));
+    CREATE INDEX IF NOT EXISTS rc_payment_history_order ON rc_payment_history(order_id,created);
     CREATE TABLE IF NOT EXISTS rc_events(id TEXT PRIMARY KEY,body TEXT NOT NULL,state TEXT NOT NULL,error TEXT,created INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS rc_refunds(order_id TEXT PRIMARY KEY,provider TEXT UNIQUE,state TEXT NOT NULL,amount INTEGER NOT NULL,restocked INTEGER NOT NULL DEFAULT 0);
     CREATE TABLE IF NOT EXISTS rc_exports(id TEXT PRIMARY KEY,incident TEXT NOT NULL,body TEXT NOT NULL,hash TEXT NOT NULL,created INTEGER NOT NULL);
@@ -329,10 +332,18 @@ export function lock(db: DB, id: string) {
     ).run(id);
   });
 }
-export function commitCapture(db: DB, id: string, capture: string) {
+export function commitCapture(
+  db: DB,
+  id: string,
+  capture: string,
+  source?: PaymentSource,
+) {
   tx(db, () => {
     const o = order(db, id);
-    if (o.capture === capture) return;
+    if (o.capture === capture) {
+      if (source) paymentEvent(db, id, "capture_verified", source, capture);
+      return;
+    }
     if (o.capture) fail("Order has a different capture.", 409);
     const holds = db
       .prepare("SELECT * FROM rc_holds WHERE order_id=?")
@@ -354,6 +365,7 @@ export function commitCapture(db: DB, id: string, capture: string) {
     db.prepare("UPDATE rc_holds SET state='committed' WHERE order_id=?").run(
       id,
     );
+    if (source) paymentEvent(db, id, "capture_verified", source, capture);
   });
 }
 export function closeIncident(db: DB, id: string) {

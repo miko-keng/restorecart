@@ -2,6 +2,7 @@ import {
   decisionInput,
   recordProductDecision,
   decisionHistory,
+  changedDecisionSources,
 } from "./decisions";
 import { readSavedReview } from "./reviewRecord";
 import { assist } from "./assistant";
@@ -46,9 +47,12 @@ export function readiness(db: DB, id: string) {
     photos = meta(db, `photos:${id}`);
   const products = i.products.map((p) => {
     const count = Object.hasOwn(counts, p.sku) ? counts[p.sku] : null;
-    const questions = productIssues(p).filter(
-      (q) => !q.startsWith("Allocation"),
-    );
+    const questions = productIssues(p);
+    const changedSources = changedDecisionSources(db, id, p.sku);
+    if (changedSources.length)
+      questions.push(
+        `Recheck changed or missing evidence: ${changedSources.join(", ")}`,
+      );
     if (!p.allocation)
       questions.push(
         "Reserve at least one physical unit, or exclude this product",
@@ -78,12 +82,51 @@ export function readiness(db: DB, id: string) {
       count: count || null,
       stale: !!count && Date.now() - count.at > 7 * 86400000,
       available: available(db, id, p.sku, p.allocation),
+      changedSources,
       priceCandidates: prices,
       imageSourceId: p.imageSourceId || null,
     };
   });
+  const rehearsal = meta(db, `rehearsal:${id}`, null);
+  const blockers: { kind: string; message: string; sku?: string }[] = [];
+  if (!["draft", "live"].includes(i.state))
+    blockers.push({
+      kind: "shop",
+      message: "This shop is closed to new orders.",
+    });
+  if (rehearsal)
+    blockers.push({
+      kind: "shop",
+      message: "Practice mode cannot publish or take payments.",
+    });
+  if (!products.some((p) => p.status === "ready"))
+    blockers.push({
+      kind: "catalog",
+      message: "Confirm at least one product and set aside stock.",
+    });
+  for (const p of products.filter((p) => p.status === "needs-information")) {
+    for (const message of p.questions)
+      blockers.push({
+        kind: "product",
+        sku: p.sku,
+        message: `${p.name}: ${message}.`,
+      });
+  }
+  if (!i.pickup.trim())
+    blockers.push({
+      kind: "pickup",
+      message: "Save pickup location and instructions.",
+    });
+  const included = i.products.filter((p) => !p.excluded);
+  if (new Set(included.map((p) => p.sku)).size !== included.length)
+    blockers.push({
+      kind: "catalog",
+      message: "Each variant needs a unique SKU.",
+    });
   return {
-    rehearsal: meta(db, `rehearsal:${id}`, null),
+    canPublish: blockers.length === 0,
+    blockers,
+    rehearsal,
     products,
     ready: products.filter((p) => p.status === "ready").length,
     needsInformation: products.filter((p) => p.status === "needs-information")

@@ -42,3 +42,48 @@ test("evaluation exposes the saved synthetic results and limitations", () => {
   assert.match(html, /not production accuracy/);
   assert.match(html, /not real merchant data/);
 });
+
+test("payment history distinguishes requested and verified events and preserves recorded times", () => {
+  const html = renderToStaticMarkup(
+    createElement(PaymentTimeline, {
+      order: {
+        state: "paid",
+        capture: "CAPTURE-1",
+        refunded: 0,
+        paymentHistory: [
+          {
+            id: "event-1",
+            kind: "capture_requested",
+            source: "api",
+            reference: "ORDER-1",
+            at: "2026-11-06T01:00:00.000Z",
+          },
+          {
+            id: "event-2",
+            kind: "capture_verified",
+            source: "reconciliation",
+            reference: "CAPTURE-1",
+            at: "2026-11-06T01:01:00.000Z",
+          },
+        ],
+      },
+    }),
+  );
+  assert.match(html, /Capture requested/);
+  assert.match(html, /Capture verified/);
+  assert.match(html, /Background reconciliation/);
+  assert.match(html, /dateTime="2026-11-06T01:01:00.000Z"/i);
+  assert.ok(
+    html.indexOf("Capture requested") < html.indexOf("Capture verified"),
+  );
+});
+
+test("legacy orders have no invented timestamped payment history", () => {
+  const html = renderToStaticMarkup(
+    createElement(PaymentTimeline, {
+      order: { state: "paid", capture: "OLDER-CAPTURE", refunded: 0 },
+    }),
+  );
+  assert.match(html, /No timestamped payment events recorded/);
+  assert.doesNotMatch(html, /<time /);
+});

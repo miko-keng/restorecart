@@ -750,3 +750,81 @@ test("RestoreCart recognized CSV columns work in a different order and preserve 
     db.close();
   }
 });
+
+test("Payment history preserves verified chronology, origin and repeat-safe capture/refund events", async () => {
+  const { paymentHistory } =
+    await import("../server/restorecart/paymentHistory");
+  const { db, id } = setup(),
+    p = transport(),
+    pay = payments(db, "http://localhost", p.fn);
+  try {
+    const o = makeOrder(db, id);
+    const created = await pay.ensure(o.id);
+    p.approve(created.provider);
+    p.timeout();
+    await assert.rejects(pay.reconcile(o.id, true));
+    assert.ok(
+      paymentHistory(db, o.id).some((e) => e.kind === "capture_check_required"),
+    );
+    await pay.worker();
+    await pay.worker();
+    await pay.refund(o.id);
+    await pay.refund(o.id);
+    const rows = paymentHistory(db, o.id);
+    assert.equal(rows.filter((e) => e.kind === "capture_verified").length, 1);
+    assert.equal(
+      rows.find((e) => e.kind === "capture_verified")?.source,
+      "reconciliation",
+    );
+    assert.equal(rows.filter((e) => e.kind === "refund_verified").length, 1);
+    assert.ok(rows.every((e) => Number.isFinite(Date.parse(e.at))));
+    assert.ok(
+      rows.findIndex((e) => e.kind === "capture_requested") <
+        rows.findIndex((e) => e.kind === "capture_verified"),
+    );
+    assert.ok(!JSON.stringify(rows).includes(o.token));
+  } finally {
+    db.close();
+  }
+});
+
+test("Verified queued webhook records receipt and processing without creating a second sale", async () => {
+  const { paymentHistory } =
+    await import("../server/restorecart/paymentHistory");
+  const { db, id } = setup(),
+    p = transport(),
+    pay = payments(db, "http://localhost", p.fn);
+  try {
+    const o = makeOrder(db, id),
+      created = await pay.ensure(o.id);
+    p.approve(created.provider);
+    const event = {
+      id: "verified-event-1",
+      event_type: "CHECKOUT.ORDER.APPROVED",
+      resource: { id: created.provider },
+    };
+    db.prepare(
+      "INSERT INTO rc_events(id,body,state,created) VALUES(?,?,'queued',?)",
+    ).run(event.id, JSON.stringify(event), Date.now());
+    await pay.worker();
+    await pay.worker();
+    const rows = paymentHistory(db, o.id);
+    assert.equal(rows.filter((e) => e.kind === "webhook_received").length, 1);
+    assert.equal(rows.filter((e) => e.kind === "webhook_processed").length, 1);
+    assert.equal(
+      rows.find((e) => e.kind === "webhook_processed")?.source,
+      "webhook",
+    );
+    assert.equal(order(db, o.id).state, "paid");
+    assert.equal(
+      (
+        db
+          .prepare("SELECT count(*) n FROM rc_moves WHERE order_id=?")
+          .get(o.id) as any
+      ).n,
+      2,
+    );
+  } finally {
+    db.close();
+  }
+});

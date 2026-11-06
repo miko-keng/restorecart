@@ -1,3 +1,4 @@
+import { paymentEvent, type PaymentSource } from "./paymentHistory";
 import { connectionEvent, verifyConnection } from "./paypalConnections";
 import { workerEvent } from "./diagnostics";
 import { paypal, paypalReady, verifyWebhook } from "../paypal";
@@ -90,9 +91,10 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
     db.prepare(
       "UPDATE rc_orders SET merchant=?,state=CASE WHEN state='creating' THEN 'awaiting_buyer' ELSE state END,body=? WHERE id=?",
     ).run(merchant, JSON.stringify(body), id);
+    paymentEvent(db, id, "checkout_created", "api", p.id);
     return order(db, id);
   }
-  async function observe(id: string, p: any) {
+  async function observe(id: string, p: any, source: PaymentSource = "api") {
     const o = order(db, id),
       pu = p.purchase_units?.[0];
     if (
@@ -115,8 +117,9 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
         typeof c.id !== "string"
       )
         fail("Capture amount does not match this checkout.", 409);
-      commitCapture(db, id, c.id);
+      commitCapture(db, id, c.id, source);
     } else if (c?.status === "PENDING") {
+      paymentEvent(db, id, "capture_pending", source, c.id || "");
       if (o.state !== "paid")
         db.prepare("UPDATE rc_orders SET state='pending' WHERE id=?").run(id);
     } else if (
@@ -124,6 +127,7 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
       p.status === "VOIDED"
     ) {
       if (o.capture) return;
+      paymentEvent(db, id, "payment_failed", source, c?.id || p.id);
       tx(db, () => {
         db.prepare("UPDATE rc_orders SET state='failed' WHERE id=?").run(id);
         db.prepare(
@@ -133,7 +137,11 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
     }
     return order(db, id);
   }
-  async function reconcile(id: string, captureApproved = false) {
+  async function reconcile(
+    id: string,
+    captureApproved = false,
+    source: PaymentSource = "api",
+  ) {
     if (busy.has(id)) return order(db, id);
     busy.add(id);
     try {
@@ -145,6 +153,8 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
       if (o.capture) return o;
       const send = forOrder(id);
       let p = await send(`/v2/checkout/orders/${o.provider}`);
+      if (p.status === "APPROVED")
+        paymentEvent(db, id, "buyer_approved", source, p.id);
       if (
         p.status === "APPROVED" &&
         [
@@ -156,6 +166,7 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
         (captureApproved || o.state !== "awaiting_buyer")
       ) {
         lock(db, id);
+        paymentEvent(db, id, "capture_requested", source, o.provider);
         try {
           p = await send(
             `/v2/checkout/orders/${o.provider}/capture`,
@@ -167,10 +178,11 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
           db.prepare(
             "UPDATE rc_orders SET state='needs_reconciliation' WHERE id=? AND state!='paid'",
           ).run(id);
+          paymentEvent(db, id, "capture_check_required", source, o.provider);
           throw e;
         }
       }
-      return await observe(id, p);
+      return await observe(id, p, source);
     } catch (e) {
       const o = order(db, id);
       if (o.state === "capture_requested")
@@ -182,7 +194,12 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
       busy.delete(id);
     }
   }
-  function adjustment(id: string, r: any, kind = "refund") {
+  function adjustment(
+    id: string,
+    r: any,
+    kind = "refund",
+    source: PaymentSource = "api",
+  ) {
     const o = order(db, id),
       amount = Math.round(Number(r.amount?.value) * 100);
     if (
@@ -218,9 +235,16 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
       db.prepare(
         "UPDATE rc_orders SET refunded=?,fulfillment=CASE WHEN fulfillment='collected' THEN fulfillment ELSE 'canceled' END WHERE id=?",
       ).run(sum, id);
+      paymentEvent(
+        db,
+        id,
+        kind === "reversal" ? "payment_reversed" : "refund_verified",
+        source,
+        r.id,
+      );
     });
   }
-  async function refund(id: string) {
+  async function refund(id: string, source: PaymentSource = "api") {
     const o = order(db, id);
     if (!o.capture || o.state !== "paid" || o.fulfillment === "collected")
       fail("Only paid, uncollected orders support a full refund here.", 409);
@@ -242,6 +266,7 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
     db.prepare(
       "INSERT OR IGNORE INTO rc_refunds(order_id,state,amount) VALUES(?,'checking',?)",
     ).run(id, o.amount);
+    paymentEvent(db, id, "refund_requested", source, o.capture);
     const send = forOrder(id);
     const r = existing?.provider
       ? await send(`/v2/payments/refunds/${existing.provider}`)
@@ -257,12 +282,15 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
         id,
       );
     if (r.status === "COMPLETED") {
-      adjustment(id, r);
+      adjustment(id, r, "refund", source);
       db.prepare(
         "UPDATE rc_refunds SET state='completed' WHERE order_id=?",
       ).run(id);
     }
+    if (r.status !== "COMPLETED")
+      paymentEvent(db, id, "refund_pending", source, r.id || "");
     if (["FAILED", "CANCELLED"].includes(r.status)) {
+      paymentEvent(db, id, "refund_failed", source, r.id || "");
       db.prepare("UPDATE rc_refunds SET state='failed' WHERE order_id=?").run(
         id,
       );
@@ -310,13 +338,14 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
       .prepare("SELECT id FROM rc_orders WHERE provider=? OR capture=?")
       .get(related.order_id || e.resource?.id || "", captureId || "") as any;
     if (!found) fail("Webhook has no matching RestoreCart order.", 409);
+    paymentEvent(db, found.id, "webhook_received", "webhook", e.id);
     const send = forOrder(found.id);
     if (e.event_type === "PAYMENT.CAPTURE.REFUNDED") {
       const r = await send(
         `/v2/payments/refunds/${encodeURIComponent(e.resource.id)}`,
       );
       if (r.status !== "COMPLETED") fail("Refund is still pending.", 409);
-      adjustment(found.id, r);
+      adjustment(found.id, r, "refund", "webhook");
       db.prepare(
         "UPDATE rc_refunds SET state='completed' WHERE order_id=? AND provider=?",
       ).run(found.id, r.id);
@@ -327,12 +356,46 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
         found.id,
         { id: `reversed:${captureId}`, status: "COMPLETED", amount: c.amount },
         "reversal",
+        "webhook",
       );
-    } else await reconcile(found.id, true);
+    } else await reconcile(found.id, true, "webhook");
+    paymentEvent(db, found.id, "webhook_processed", "webhook", e.id);
+  }
+  function eventOrder(e: any) {
+    const related = e.resource?.supplementary_data?.related_ids || {};
+    const captureId =
+      related.capture_id ||
+      ([
+        "PAYMENT.CAPTURE.COMPLETED",
+        "PAYMENT.CAPTURE.PENDING",
+        "PAYMENT.CAPTURE.DENIED",
+        "PAYMENT.CAPTURE.REVERSED",
+      ].includes(e.event_type)
+        ? e.resource?.id
+        : "") ||
+      /\/v2\/payments\/captures\/([A-Z0-9]+)$/.exec(
+        e.resource?.links?.find((l: any) => l.rel === "up")?.href || "",
+      )?.[1] ||
+      "";
+    return db
+      .prepare("SELECT id FROM rc_orders WHERE provider=? OR capture=?")
+      .get(related.order_id || e.resource?.id || "", captureId) as any;
   }
   async function receive(headers: Record<string, unknown>, event: any) {
     if (typeof event.id !== "string" || !(await verifyWebhook(headers, event)))
       fail("Webhook signature could not be verified.", 400);
+    const previous = db
+      .prepare("SELECT body FROM rc_events WHERE id=?")
+      .get(event.id) as any;
+    const matched = eventOrder(previous ? JSON.parse(previous.body) : event);
+    if (matched)
+      paymentEvent(
+        db,
+        matched.id,
+        previous ? "webhook_duplicate_ignored" : "webhook_received",
+        "webhook",
+        event.id,
+      );
     db.prepare(
       "INSERT OR IGNORE INTO rc_events(id,body,state,error,created) VALUES(?,?,'queued',NULL,?)",
     ).run(event.id, JSON.stringify(event), Date.now());
@@ -349,7 +412,7 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
           Date.now(),
           o.id,
         );
-        await reconcile(o.id, true);
+        await reconcile(o.id, true, "reconciliation");
       } catch {
         workerEvent(db, "retry", "payment", order(db, o.id).incident);
       }
@@ -357,7 +420,7 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
       .prepare("SELECT order_id FROM rc_refunds WHERE state='checking' LIMIT 5")
       .all() as any[]) {
       try {
-        await refund(r.order_id);
+        await refund(r.order_id, "reconciliation");
       } catch {
         workerEvent(db, "retry", "refund", order(db, r.order_id).incident);
       }
@@ -368,11 +431,18 @@ export function payments(db: DB, base: string, transport: Transport = paypal) {
       )
       .all(Date.now()) as any[]) {
       try {
-        await processEvent(JSON.parse(e.body));
+        const event = JSON.parse(e.body);
+        const matched = eventOrder(event);
+        if (matched)
+          paymentEvent(db, matched.id, "webhook_received", "webhook", e.id);
+        await processEvent(event);
         db.prepare(
           "UPDATE rc_events SET state='done',error=NULL WHERE id=?",
         ).run(e.id);
       } catch (err) {
+        const matched = eventOrder(JSON.parse(e.body));
+        if (matched)
+          paymentEvent(db, matched.id, "webhook_retry", "webhook", e.id);
         workerEvent(db, "retry", "webhook");
         db.prepare(
           "UPDATE rc_events SET state='retry',error=?,attempts=attempts+1,next_run=? WHERE id=?",
