@@ -15,7 +15,7 @@ npm run dev:restorecart
 
 Open [RestoreCart locally](http://127.0.0.1:4370/restorecart).
 
-Demo buyer/seller usernames, emails, passwords and seed instructions are listed at the top of [README.md](README.md#restorecart-demo-accounts-local-practice). Run `npm run restorecart:demo-accounts` once for a new local database. Register private accounts through the UI for hosted use. The configured legacy workspace owner still uses RESTORECART_SELLER_EMAIL / RESTORECART_SELLER_PASSWORD; new seller registrations have isolated workspaces and use the single configured sandbox merchant for checkout.
+Use the configured seller (`workspace-owner`) to manage the preloaded **Sunday Studio Sample Shop** and **Sunday Studio Demo** draft. Sign in with the email and password set by `RESTORECART_SELLER_EMAIL` and `RESTORECART_SELLER_PASSWORD`. The local seed command creates separate `demo-seller` and `demo-buyer` accounts in the selected database. See the [account table and seed instructions](README.md#restorecart-demo-accounts-local-practice).
 
 ## Buyer and seller entry points
 
@@ -151,7 +151,7 @@ See [build and test report](docs/restorecart/BUILD_REPORT.md), [implementation p
 
 Run `npm run restorecart:demo-accounts` locally to prepare **Sunday Studio Demo** for `demo-seller`. The draft includes the sample stock CSV, older catalog PDF and saved pickup/contact details. Products still require seller review: source price conflicts, physical counts, allocations and confirmation. The preload uses explicit sample records, not a live Gemini generation. Use **Review with Gemini** for live assistance. AI configuration remains live.
 
-Preparation is idempotent: it does not reset reviewed work on subsequent runs, overwrite a published shop, create orders or change real payment records. Other shops remain stored. The prepared demo is selected on seller sign-in and its selector shows that shop only. The preparation script refuses production; hosted demo preparation requires a separately reviewed deployment setup.
+Preparation is idempotent: it does not reset reviewed work on subsequent runs, overwrite a published shop, create orders or change real payment records. Other shops remain stored. The shop selector lists the signed-in seller’s shops. The seeded `demo-seller` account owns its own draft, and the configured seller owns the preloaded published sample shop. The preparation script refuses production; hosted demo preparation requires a separately reviewed deployment setup.
 
 Under **Orders**, expand **Example order statuses — simulated, no payments** to show checking, to prepare, ready, collected, canceled and refunded examples. These are presentation-only cards, excluded from APIs, inventory, payment totals and recovery. Real orders continue through PayPal sandbox.
 

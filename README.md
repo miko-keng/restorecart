@@ -6,7 +6,7 @@ RestoreCart reconstructs a catalog from surviving records, opens a temporary pic
 
 ## Try the demo without a purchase
 
-Sign in as a seller and select **Sunday Studio Demo** in **Shop editor**. If it is missing, open **Shop options → Load prepared Sunday Studio Demo**. Click **Open AI review** to replay the saved Gemini response without a new API call. Use **Review next** or a product’s **Review** button to open its details, check the source prices and confirm stock. **Preview** and **Publish** stay in the editor.
+Sign in as the configured seller (`workspace-owner`) and select **Sunday Studio Demo** in **Shop editor**. See the [seller sign-in details](#restorecart-demo-accounts-local-practice). If it is missing, open **Shop options → Load prepared Sunday Studio Demo**. Click **Open AI review** to replay the saved Gemini response without a new API call. Use **Review next** or a product’s **Review** button to open its details, check the source prices and confirm stock. **Preview** and **Publish** stay in the editor.
 
 For the order demo, go to **Orders → Sample orders → Assistant → Play demo chat**. Try **Approve** or **Reject** on the $20 Blue mug example. Sample actions never affect payments, inventory or recovery reports. **Sandbox orders** shows orders placed through test checkout. Open an order to see its payment history and pickup details.
 
@@ -232,21 +232,23 @@ The earlier documented local seller/buyer E2E run used live Gemini review and on
 
 ## RestoreCart demo accounts (local practice)
 
-These two accounts have been registered in the local RestoreCart database. Sign in with either the username or email.
+**To manage the preloaded shops**, sign in at `/restorecart/seller/sign-in` using the configured seller email and password (`RESTORECART_SELLER_EMAIL` and `RESTORECART_SELLER_PASSWORD`). This account appears as `workspace-owner` and owns **Sunday Studio Sample Shop** and the preloaded **Sunday Studio Demo** draft when those shops are present. **Shop editor** lists the shops owned by the signed-in seller.
+
+**To create separate practice accounts**, run `npm run restorecart:demo-accounts` against the same local database your server uses. Then sign in with the username or email below.
 
 | Role   | Username      | Email                          | Password             | Sign-in page                  |
 | ------ | ------------- | ------------------------------ | -------------------- | ----------------------------- |
 | Seller | `demo-seller` | `seller.demo@restorecart.test` | `RestoreSeller2026!` | `/restorecart/seller/sign-in` |
 | Buyer  | `demo-buyer`  | `buyer.demo@restorecart.test`  | `RestoreBuyer2026!`  | `/restorecart/account`        |
 
-They are public synthetic **RestoreCart app** credentials, not your PayPal sandbox credentials. Use them for local demonstration only. The seller has its own “Sunday Studio Demo” workspace with the example source records; it does not take ownership of earlier shops or orders. No public demo accounts are automatically created by the server. The configured seller receives a prepared Sunday Studio Demo draft when their workspace is empty; registered sellers can use **Load prepared Sunday Studio Demo** to create their own isolated copy.
+These credentials are for local RestoreCart practice. The seeder prepares a separate **Sunday Studio Demo** draft for `demo-seller`. Other registered sellers can use **Shop options → Load prepared Sunday Studio Demo** to create a draft in their own workspace.
 
 ```sh
 npm run restorecart:demo-accounts
 npm run dev:restorecart
 ```
 
-The first command creates missing demo accounts in the current RestoreCart database and never resets an existing password. It refuses production mode. If starting with a fresh database, run it before the demo; copying the source repository alone does not copy account records. Hosted instances require separately registered accounts with private passwords. Registration is available on both sign-in pages and creates a separate seller workspace or a buyer account; it does not connect another merchant's PayPal account.
+The seeder creates missing accounts in the selected local database and preserves existing passwords. For a hosted demo, use the configured seller credentials or register a private practice account.
 
 Start at [seller sign-in](http://127.0.0.1:4370/restorecart/seller/sign-in) or [buyer sign-in](http://127.0.0.1:4370/restorecart/account). One browser session signs in as one account at a time. To show both roles simultaneously, use separate browser profiles or a private window.
 
