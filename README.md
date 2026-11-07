@@ -2,7 +2,15 @@
 
 RestoreCart reconstructs a catalog from surviving records, opens a temporary pickup storefront with PayPal sandbox checkout, and returns emergency sales through a duplicate-safe local recovery process. Detailed setup: [RESTORECART_README.md](RESTORECART_README.md).
 
-[Hosted demo](https://restorecart.onrender.com/restorecart) · [Judge access](docs/restorecart/JUDGE_ACCESS.md) · [Three-minute recording guide](DEMO_REHEARSAL_GUIDE.md) · [Submission description](docs/restorecart/SUBMISSION_DESCRIPTION.md) · [Final release status](docs/restorecart/RELEASE_CHECKLIST.md)
+[Hosted demo](https://restorecart.onrender.com/restorecart) · [Judge access](docs/restorecart/JUDGE_ACCESS.md) · [Simple recording guide](docs/restorecart/RECORDED_SUBMISSION_GUIDE.md) · [Submission description](docs/restorecart/SUBMISSION_DESCRIPTION.md) · [Final release status](docs/restorecart/RELEASE_CHECKLIST.md)
+
+## Try the demo without a purchase
+
+Sign in as a seller and select **Sunday Studio Demo** in **Shop editor**. If it is missing, open **Shop options → Load prepared Sunday Studio Demo**. Click **Open AI review** to replay the saved Gemini response without a new API call. Use **Review next** or a product’s **Review** button to open its details, check the source prices and confirm stock. **Preview** and **Publish** stay in the editor.
+
+For the order demo, go to **Orders → Sample orders → Assistant → Play demo chat**. Try **Approve** or **Reject** on the $20 Blue mug example. Sample actions never affect payments, inventory or recovery reports. **Sandbox orders** shows orders placed through test checkout. Open an order to see its payment history and pickup details.
+
+Use the [simple recording guide](docs/restorecart/RECORDED_SUBMISSION_GUIDE.md) for the seller-only video, or the [full-transaction rehearsal](DEMO_REHEARSAL_GUIDE.md) to test checkout and recovery.
 
 ## PayPal seller-account limitation — current demo
 
@@ -23,7 +31,7 @@ A Turso migration and hosted restart test passed on 4 November, but that connect
 | What a reviewer sees | Where it comes from | Storage behavior |
 | --- | --- | --- |
 | Prepared Sunday Studio catalog and review draft | Sample source records plus saved seller edits | Resettable SQLite records; fixtures can seed an empty database |
-| Sample preview order statuses and pickup appointments | UI-only simulated examples | Reappear from code; never affect PayPal totals, stock or recovery |
+| Sample order statuses and pickup appointments | UI-only simulated examples | Reappear from code; never affect PayPal totals, stock or recovery |
 | A buyer's actual PayPal sandbox checkout | PayPal sandbox API plus RestoreCart's database | New app records are temporary; PayPal retains its own sandbox transaction |
 | Seller fulfillment and duplicate-safe local-file recovery | Recorded orders and recovery journals | SQLite journal prevents duplicates while retained; reset loses that journal |
 
@@ -32,9 +40,9 @@ Pushing this repository to GitHub preserves source code and sample fixtures, **n
 
 ### Evidence and how to reproduce it
 
-- **Current automated verification:** 198 tests passed on 6 November 2026; production build passed. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current backend verification and measured AI results](docs/restorecart/BACKEND_VERIFICATION_2026_11.md).
+- **Current automated verification:** 200 tests and the production build passed for the 7 November 2026 seller workspace update. Desktop and mobile browser checks covered the editor and sample Orders flow. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current backend verification and measured AI results](docs/restorecart/BACKEND_VERIFICATION_2026_11.md).
 - **Historical real sandbox E2E:** the documented local run used live Gemini and a $52 PayPal sandbox capture, followed by fulfillment, backup restoration and duplicate-safe local recovery. The historical 84-test count belongs to that earlier run. [Recorded E2E report](docs/restorecart/FINAL_E2E_REPORT.md).
-- **Local demonstration:** follow the [input/button rehearsal guide](DEMO_REHEARSAL_GUIDE.md) to show actual sandbox checkout, Orders, pickup tracking and recovery in one running session. Clearly identify Sample preview and saved Gemini replay. An edited demonstration should not imply simulated examples are actual payments.
+- **Local demonstration:** follow the [input/button rehearsal guide](DEMO_REHEARSAL_GUIDE.md) to show actual sandbox checkout, Orders, pickup tracking and recovery in one running session. Clearly identify Sample orders and saved Gemini replay. An edited demonstration should not imply simulated examples are actual payments.
 - **Submission video:** final public video link is pending. The recording should show the working flow and distinguish sample statuses, saved AI replay and actual sandbox purchases. No claim is made here that an unlinked video has already been reviewed.
 - **Historical hosted checkout verification:** implementation commit `85c9474` was deployed on 31 October 2026 and completed a real $52 PayPal sandbox capture, seller fulfillment, buyer pickup tracking and local-file recovery with zero repeat changes. [Hosted release report](docs/restorecart/HOSTED_RELEASE_REPORT.md). Webhook delivery was not independently observed in that journey; it used the verified server payment flow. That earlier deployment used temporary storage. The separate 4 November Turso/restart verification is historical; current hosting again uses temporary SQLite.
 
@@ -46,7 +54,7 @@ When deployed, the latest code recreates a labelled published **Sunday Studio Sa
 
 [Earlier verification: 98 tests and browser checks](docs/restorecart/APPROVED_FIXES_TEST_REPORT.md) · [Changes and limits](docs/restorecart/APPROVED_FIXES.md) · [Optional WooCommerce test connector](docs/restorecart/WOOCOMMERCE_TEST_CONNECTOR.md) · [Merchant trial protocol](docs/restorecart/MERCHANT_TRIAL_GUIDE.md). WooCommerce is **Not connected** until configured; live integration remains unverified.
 
-Saved Sunday Studio Gemini review can now be replayed with **zero API calls**, labelled with its original date. Order-status samples follow the selected filter. [Replay provenance and verification](docs/restorecart/SAVED_GEMINI_REVIEW.md).
+The Sunday Studio AI review has one **Saved response** badge. Its original date and model are under **Details**. Opening it makes **zero API calls**. [Replay provenance and verification](docs/restorecart/SAVED_GEMINI_REVIEW.md).
 
 ## Evidence verification and persistent storage
 
@@ -74,7 +82,7 @@ flowchart LR
     Views --> Confirm["Seller confirms appointment"]
 ```
 
-In **Orders → Actual sandbox orders**, open **Chat with Gemini**. Type an order question or choose **Review orders** / **Plan pickups**. Each recommendation shows the order, verified facts and **Approve / Reject** buttons. Approving a pickup saves its exact proposed time after current server checks; other approvals open the order so the seller can complete the task. Rejection records a dismissal. Default grid advice is deterministic. In **Pickup schedule**, save opening dates, then **Suggest pickup plan with Gemini** → **Review appointment** → **Confirm appointment**. Blue timeline events are unsaved proposals. The server computes times and rejects stale or overlapping changes; buyers see only saved appointments. Sample preview makes no AI calls. Its isolated preparation walkthrough supports local Approve / Reject practice; see [recording and reliability notes](docs/restorecart/SAMPLE_CHAT_AND_RELIABILITY.md).
+In **Orders → Sandbox orders**, open **Assistant**. Type an order question or choose **Review orders** / **Plan pickups**. Each recommendation shows the order, verified facts and **Approve / Reject** buttons. Approving a pickup saves its exact proposed time after current server checks; other approvals open the order so the seller can complete the task. Rejection records a dismissal. Default grid advice is deterministic. In **Pickup schedule**, save opening dates, then **Suggest pickup plan with Gemini** → **Review appointment** → **Confirm appointment**. Blue timeline events are unsaved proposals. The server computes times and rejects stale or overlapping changes; buyers see only saved appointments. Sample orders and the saved demo chat make no AI calls. Its isolated preparation walkthrough supports local Approve / Reject practice; see [recording and reliability notes](docs/restorecart/SAMPLE_CHAT_AND_RELIABILITY.md).
 
 [Implementation, tools and measured checks](docs/restorecart/AGENT_IMPLEMENTATION_REPORT.md) · [Controlled agent tests](tests/restorecart-agents.test.ts) · [Actual Gemini evaluation](tests/evidence/restorecart-live-agents.json).
 
@@ -93,7 +101,7 @@ The core import → review → publish → checkout → recovery flow stays the 
 | Improvement | How to use it |
 | --- | --- |
 | Seller decision history | Use a field-level suggestion or choose **Keep current value**, then save the product. Expand **Seller decision history** to see accepted, rejected or overridden suggestions, final values, supporting source hashes, seller and timestamp. Clicking alone does not record a saved decision. |
-| AG Grid order workspace | In Orders → Order table, choose All, Needs attention, To prepare or Unscheduled pickups. Search and filter amounts in USD. The captured/refunded/net totals follow the visible rows; export filtered CSV or reset the table. Table preferences survive navigation in the same browser session. |
+| AG Grid order workspace | In Orders, use search, the status filter or the Table / Pickup schedule selector. The table shows Order, Items, Status, Next action and Total. Open Table options for CSV export or extra financial and pickup columns. |
 | Bryntum pickup planning | In Orders → Pickup schedule, save opening dates, find the next available slot and confirm it. Dragging an eligible appointment proposes a change; **Confirm appointment** saves it. Keyboard-accessible forms provide the same rescheduling path. Click an appointment to open its order. |
 | Payment and stock safeguards | Server checks reject overlapping appointments, outdated edits and ineligible orders. Buyer receipts show saved pickup changes. Concurrent checkout, repeated capture/refund notifications and interrupted refunds have automated regression coverage. |
 
@@ -215,12 +223,12 @@ The buyer approves payment on PayPal; RestoreCart verifies the outcome before ma
 
 - **Shop backup:** saves catalog, evidence, images and shop details for a new unpublished draft or an isolated rehearsal. It excludes accounts, orders and payments; fresh stock confirmation is required after restoration.
 - **Sales recovery:** returns recorded emergency sales, refunds and stock changes through the supported **local Original Store JSON v1 adapter**. The local adapter does not update Shopify or WooCommerce. A separate optional WooCommerce test connector previews and returns supported simple-product sales after connection and confirmation; it does not charge a buyer again.
-- **Demo boundary:** prepared records and simulated order-status cards are labelled examples. Simulated cards never enter payment, inventory or recovery records. Actual checkout uses PayPal sandbox. One configured sandbox merchant receives payments; independent seller payout onboarding is not implemented.
+- **Demo boundary:** prepared records and simulated order-status cards are labelled examples. Simulated cards never enter payment, inventory or recovery records. Actual checkout uses PayPal sandbox. In Shared demo mode, one configured sandbox business account receives all test payments. Individual seller onboarding has not been verified end to end.
 - **Hosting boundary:** SQLite requires persistent storage to retain accounts, uploads and orders across redeploys. The free Render configuration is ephemeral; see [deployment instructions](DEPLOY_RENDER.md).
 
 ## Demo verification and rehearsal
 
-The earlier documented local seller/buyer E2E run used live Gemini review and one real PayPal sandbox capture ($52 test funds), then verified pickup tracking, backup restoration and zero-duplicate recovery. At that milestone, 84 automated tests and the production build passed. The current automated suite contains 153 tests; see the reviewer guide above. [Read the scoped test report](docs/restorecart/FINAL_E2E_REPORT.md) and [follow the exact input/button guide](DEMO_REHEARSAL_GUIDE.md). For the newer hosted verification, see the [hosted release report](docs/restorecart/HOSTED_RELEASE_REPORT.md); independent hosted webhook delivery remains unverified.
+The earlier documented local seller/buyer E2E run used live Gemini review and one real PayPal sandbox capture ($52 test funds), then verified pickup tracking, backup restoration and zero-duplicate recovery. At that milestone, 84 automated tests and the production build passed. See the reviewer guide above for current verification. [Read the scoped test report](docs/restorecart/FINAL_E2E_REPORT.md) and [follow the exact input/button guide](DEMO_REHEARSAL_GUIDE.md). For the newer hosted verification, see the [hosted release report](docs/restorecart/HOSTED_RELEASE_REPORT.md); independent hosted webhook delivery remains unverified.
 
 ## RestoreCart demo accounts (local practice)
 
@@ -279,9 +287,9 @@ See [Render deployment instructions](DEPLOY_RENDER.md) to deploy this repository
 
 After deploying the latest `main`, sign in with the hosted seller credentials configured in Render. An empty configured workspace receives **Sunday Studio Demo** automatically. Other registered sellers can click **Load prepared Sunday Studio Demo**. This authenticated, CSRF-protected setup preserves existing shop reviews, publication and sales. It creates sample records and shop details, not fabricated paid orders or public credentials.
 
-Under **Orders**, select **Sample preview** for six clearly labelled simulated order statuses. The desktop table, mobile cards and pickup schedule share these UI-only examples. They never enter actual order storage, inventory changes, payment totals or recovery exports.
+Under **Orders**, select **Sample orders** for six clearly labelled simulated order statuses. The desktop table, mobile cards and pickup schedule share these UI-only examples. They never enter actual order storage, inventory changes, payment totals or recovery exports.
 
-Switch to **Actual sandbox orders** for buyer purchases. Desktop uses AG Grid Community with sorting, filters and Open order; narrow screens use cards. Pickup schedule displays seller-saved appointments for eligible paid orders; a plain list is always available. The optional Bryntum evaluation timeline requires `VITE_ENABLE_BRYNTUM=true` and applicable evaluation/deployment rights. Sample appointments are illustrative, not actual buyer bookings.
+Switch to **Sandbox orders** for buyer purchases. Desktop uses AG Grid Community with sorting and filters; select a row to open the order; narrow screens use cards. Pickup schedule displays seller-saved appointments for eligible paid orders; a plain list is always available. The optional Bryntum evaluation timeline requires `VITE_ENABLE_BRYNTUM=true` and applicable evaluation/deployment rights. Sample appointments are illustrative, not actual buyer bookings.
 
 See [migration audit and verification](docs/restorecart/HOSTED_DEMO_AND_ORDERS.md) for the extraction check and limitations.
 
@@ -298,7 +306,7 @@ In **Settings → Connections**, a visible **WooCommerce** card shows **Not conn
 
 Local recovery now shows returned orders, stock changes, recorded captured/refunded/net amounts, and a **Return verified** result only after a repeat comparison finds no changes. These numbers come from retained orders and inventory events, not hardcoded demo totals. Technical changes are expandable. This proves updating the supported local JSON file; it does not claim an automatic WooCommerce return.
 
-Final verification and submission handoff: [test evidence](docs/restorecart/FINAL_SELF_SERVICE_REPORT.md), [submission checklist and judging evidence](docs/restorecart/SUBMISSION_HANDOFF.md), [updated 2:55 recording script](DEMO_REHEARSAL_GUIDE.md). New local verification is separate from the historical hosted $52 transaction. The public video still needs to be recorded, uploaded and linked.
+Final verification and submission handoff: [test evidence](docs/restorecart/FINAL_SELF_SERVICE_REPORT.md), [submission checklist and judging evidence](docs/restorecart/SUBMISSION_HANDOFF.md), [simple seller-only recording guide](docs/restorecart/RECORDED_SUBMISSION_GUIDE.md). New local verification is separate from the historical hosted $52 transaction. The public video still needs to be recorded, uploaded and linked.
 
 ### WooCommerce connection entry
 
