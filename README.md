@@ -4,6 +4,22 @@ RestoreCart reconstructs a catalog from surviving records, opens a temporary pic
 
 [Hosted demo](https://restorecart.onrender.com/restorecart) · [Judge access](docs/restorecart/JUDGE_ACCESS.md) · [Simple recording guide](docs/restorecart/RECORDED_SUBMISSION_GUIDE.md) · [Submission description](docs/restorecart/SUBMISSION_DESCRIPTION.md) · [Final release status](docs/restorecart/RELEASE_CHECKLIST.md)
 
+## Verified sandbox walkthrough
+
+On 9 November 2026, RestoreCart verified a **US$52.00 PayPal Sandbox capture** for two Blue mugs and one Natural tote. After collection, recovery applied one order and two stock adjustments to a practice **Original Store JSON v1** file. The repeat comparison found **one order already recorded and zero new changes**.
+
+![Seller payment history showing the verified US$52.00 PayPal Sandbox capture](docs/restorecart/evidence/2026-11-09/02-verified-paypal-capture.jpg)
+
+![Repeat recovery showing one order already recorded and zero new changes](docs/restorecart/evidence/2026-11-09/04-repeat-recovery-zero-changes.jpg)
+
+[Buyer receipt](docs/restorecart/evidence/2026-11-09/01-buyer-receipt.jpg) · [First recovery comparison showing three changes](docs/restorecart/evidence/2026-11-09/03-recovery-preview.jpg)
+
+### Pickup rescheduling with a simulated order
+
+In a separate local rehearsal, the buyer blocked a pickup time in Bryntum. AG Grid flagged the conflict and opened the seller’s schedule editor. The seller confirmed a replacement and the attention count returned to zero.
+
+[Buyer blocks the pickup](docs/restorecart/evidence/2026-11-09/05-simulated-buyer-pickup-block.jpg) · [AG Grid flags the conflict](docs/restorecart/evidence/2026-11-09/06-simulated-ag-grid-pickup-conflict.jpg) · [Seller reviews the replacement time](docs/restorecart/evidence/2026-11-09/07-simulated-bryntum-replacement.jpg)
+
 ## Try the demo without a purchase
 
 Sign in as the configured seller (`workspace-owner`) and select **Sunday Studio Demo** in **Shop editor**. See the [seller sign-in details](#restorecart-demo-accounts-local-practice). If it is missing, open **Shop options → Load prepared Sunday Studio Demo**. Click **Open AI review** to replay the saved Gemini response without a new API call. Use **Review next** or a product’s **Review** button to open its details, check the source prices and confirm stock. **Preview** and **Publish** stay in the editor.
