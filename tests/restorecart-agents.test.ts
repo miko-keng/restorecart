@@ -10,6 +10,7 @@ import {
   reserve,
   lock,
   commitCapture,
+  closeIncident,
   order,
 } from "../server/restorecart/store";
 import {
@@ -27,6 +28,7 @@ import {
 } from "../server/restorecart/agentCoordinator";
 import {
   planOperations,
+  planRecovery,
   decideOperation,
   proposePickupSlots,
 } from "../server/restorecart/operationsAgent";
@@ -35,7 +37,11 @@ import {
   savePickupAvailability,
   savePickupWindow,
 } from "../server/restorecart/pickups";
-import { putMeta } from "../server/restorecart/continuity";
+import {
+  putMeta,
+  originalExample,
+  reconciliation,
+} from "../server/restorecart/continuity";
 import {
   allowedOrderActions,
   nextOrderAction,
@@ -357,6 +363,79 @@ test("Investigation cannot save current findings after a concurrent product edit
     f.db.close();
   }
 });
+test("Recovery triage shares the payment gate and leaves orders, refunds and stock untouched", async () => {
+  const {
+    db,
+    id,
+    purchases: [captureOrder, refundOrder],
+  } = await operationFixture();
+  try {
+    closeIncident(db, id);
+    db.prepare(
+      "UPDATE rc_orders SET state='pending', capture=NULL WHERE id=?",
+    ).run(captureOrder);
+    db.prepare(
+      "INSERT INTO rc_refunds(order_id,state,amount) VALUES(?,'checking',2000)",
+    ).run(refundOrder);
+    const refunds = () => db.prepare("SELECT * FROM rc_refunds").all();
+    const before = orderSnapshot(db);
+    const beforeRefunds = refunds();
+    const original = originalExample(db, id);
+    assert.throws(
+      () => reconciliation(db, id, original),
+      /Resolve pending payments and refunds/,
+    );
+
+    const question = { message: "Which refund is blocking recovery?" };
+    const plan = await planRecovery(db, id, question, (async (_url, init) => {
+      const request = JSON.parse(String(init?.body));
+      const facts = JSON.parse(request.contents[0].parts[0].text);
+      assert.deepEqual(facts.blockers, [
+        { orderId: captureOrder, kind: "capture" },
+        { orderId: refundOrder, kind: "refund" },
+      ]);
+      return reply("focusRecoveryBlocker", { orderId: refundOrder });
+    }) as typeof fetch);
+    assert.equal(plan.source, "gemini");
+    assert.equal(plan.recoveryBlockerCount, 2);
+    assert.equal(plan.recoveryBlockers[0].orderId, refundOrder);
+    assert.match(plan.recoveryBlockers[0].guidance, /refund verification/);
+
+    for (const transport of [
+      (async () =>
+        reply("focusRecoveryBlocker", {
+          orderId: "unknown-order",
+        })) as typeof fetch,
+      (async () => {
+        throw Error("Gemini unavailable");
+      }) as typeof fetch,
+    ]) {
+      const fallback = await planRecovery(db, id, question, transport);
+      assert.equal(fallback.source, "policy");
+      assert.deepEqual(
+        fallback.recoveryBlockers.map((item) => item.orderId),
+        [captureOrder, refundOrder],
+      );
+    }
+    assert.equal(orderSnapshot(db), before);
+    assert.deepEqual(refunds(), beforeRefunds);
+
+    const updated = await planRecovery(db, id, question, (async () => {
+      db.prepare(
+        "UPDATE rc_refunds SET state='completed' WHERE order_id=?",
+      ).run(refundOrder);
+      return reply("focusRecoveryBlocker", { orderId: refundOrder });
+    }) as typeof fetch);
+    assert.equal(updated.source, "policy");
+    assert.deepEqual(
+      updated.recoveryBlockers.map((item) => item.orderId),
+      [captureOrder],
+    );
+  } finally {
+    db.close();
+  }
+});
+
 test("Operations plans validate actions, avoid overlapping proposals, and never mutate orders or appointments", async () => {
   const f = await operationFixture();
   try {

@@ -1,11 +1,18 @@
+import { matchesOrderFilter } from "../src/restorecart/orderExamples";
 import { rememberReview } from "../server/restorecart/reviewRecord";
 import { sourceList } from "../server/restorecart/sources";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createApp } from "../server/restorecart/app";
-import { openRC, incident, save, order } from "../server/restorecart/store";
+import {
+  openRC,
+  incident,
+  save,
+  order,
+  publish,
+} from "../server/restorecart/store";
 
-async function fixture() {
+async function fixture(buyerSearchTransport?: typeof fetch) {
   const db = openRC(":memory:");
   let n = 0,
     refundNumber = 0;
@@ -57,6 +64,7 @@ async function fixture() {
     base: "http://localhost",
     testPassword: "Testing123!",
     paymentTransport: transport,
+    buyerSearchTransport,
   });
   const server = runtime.app.listen(0, "127.0.0.1");
   await new Promise<void>((r) => server.once("listening", r));
@@ -1463,10 +1471,10 @@ test("RestoreCart registered buyer retains private orders after logout and login
     };
     const registered = await f.buyer.request("/register", c);
     assert.equal(registered.status, 200);
-    assert.equal(
-      (await f.buyer.request("/my-orders")).data[0].id,
-      made.data.id,
-    );
+    const orders = (await f.buyer.request("/my-orders")).data;
+    assert.equal(orders[0].id, made.data.id);
+    assert.deepEqual(orders[0].items, [{ name: "Blue mug", quantity: 1 }]);
+    assert.equal(orders[0].body, undefined);
     await f.buyer.request("/logout", {});
     await f.buyer.request("/session");
     await f.buyer.request("/login", {
@@ -2528,6 +2536,18 @@ test("Agent history and operations endpoints enforce seller ownership and CSRF w
       ).status,
       403,
     );
+    const recoveryPath = `/incidents/${f.id}/agent-recovery`;
+    for (const client of [f.buyer, f.stranger])
+      assert.equal((await client.request(recoveryPath, {})).status, 403);
+    assert.equal(
+      (await f.seller.request(recoveryPath, {}, "POST", false)).status,
+      403,
+    );
+    const recovery = await f.seller.request(recoveryPath, {});
+    assert.equal(recovery.status, 200);
+    assert.equal(recovery.data.source, "policy");
+    assert.deepEqual(recovery.data.recoveryBlockers, []);
+
     const fakeDecision = {
       runId: "missing-plan",
       orderId: "unknown",
@@ -2712,6 +2732,255 @@ test("Buyer basket explains missing seller connection and never silently enables
   } finally {
     if (originalDemo === undefined) delete process.env.PAYPAL_ALLOW_SHARED_DEMO;
     else process.env.PAYPAL_ALLOW_SHARED_DEMO = originalDemo;
+    await f.close();
+  }
+});
+
+async function registerBuyer(
+  client: Awaited<ReturnType<typeof fixture>>["buyer"],
+  name: string,
+) {
+  const result = await client.request("/register", {
+    email: `${name}@restorecart.test`,
+    username: name,
+    password: "BuyerTesting123!",
+    role: "buyer",
+  });
+  assert.equal(result.status, 200);
+  return result.data.user;
+}
+
+test("Buyer search agent searches the published catalog and returns only verified product links", async () => {
+  let phase = 0;
+  let redId = "";
+  let blueId = "";
+  const fake = (async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    const tool = (name: string, args: unknown) =>
+      Response.json({
+        candidates: [
+          { content: { parts: [{ functionCall: { name, args } }] } },
+        ],
+      });
+    switch (phase++) {
+      case 0:
+        assert.deepEqual(JSON.parse(body.contents[0].parts[0].text), {
+          question: "In-stock mug under $19",
+        });
+        return tool("searchPublishedProducts", {
+          keywords: "mug",
+          maxPrice: 19,
+          inStock: true,
+        });
+      case 1: {
+        const { result } =
+          body.contents.at(-1).parts[0].functionResponse.response;
+        assert.deepEqual(
+          result.map((item: any) => item.name),
+          ["Red mug"],
+        );
+        redId = result[0].id;
+        return tool("searchPublishedProducts", {
+          keywords: "mug",
+          inStock: false,
+        });
+      }
+      case 2: {
+        const { result } =
+          body.contents.at(-1).parts[0].functionResponse.response;
+        assert.deepEqual(
+          result.map((item: any) => item.id),
+          [redId],
+        );
+        return tool("presentProducts", {
+          ids: ["invented", blueId, redId, redId],
+        });
+      }
+      case 3:
+        assert.equal(
+          JSON.parse(body.contents[0].parts[0].text).previousQuestion,
+          "In-stock mug under $19",
+        );
+        return tool("presentProducts", {
+          ids: [],
+          clarification: "Would you like another color?",
+        });
+      default:
+        throw Error("Gemini unavailable");
+    }
+  }) as typeof fetch;
+  const f = await fixture(fake);
+  try {
+    const shop = await prepare(f);
+    blueId = JSON.stringify([shop.slug, "MUG-BLU"]);
+    const path = "/buyer/search-agent";
+    const query = { question: "In-stock mug under $19" };
+    assert.equal((await f.buyer.request(path, query)).status, 403);
+    assert.equal((await f.seller.request(path, query)).status, 403);
+    await registerBuyer(f.buyer, "search-buyer");
+    assert.equal(
+      (await f.buyer.request(path, query, "POST", false)).status,
+      403,
+    );
+    const result = await f.buyer.request(path, query);
+    assert.equal(result.status, 200);
+    assert.equal(result.data.source, "gemini");
+    assert.deepEqual(
+      result.data.products.map((item: any) => [
+        item.shop.slug,
+        item.product.sku,
+        item.product.price,
+      ]),
+      [[shop.slug, "MUG-RED", "18.00"]],
+    );
+    const followUp = await f.buyer.request(path, {
+      question: "Anything similar?",
+      previousQuestion: query.question,
+    });
+    assert.equal(followUp.data.clarification, "Would you like another color?");
+    assert.deepEqual((await f.buyer.request(path, query)).data, {
+      source: "directory",
+      products: [],
+      clarification: null,
+    });
+    assert.equal(phase, 5);
+  } finally {
+    await f.close();
+  }
+});
+
+test("Buyer pickup blocks prevent conflicting appointments and flag existing pickups for rescheduling", async () => {
+  const f = await fixture();
+  try {
+    await registerBuyer(f.buyer, "pickup-buyer");
+    await registerBuyer(f.stranger, "other-buyer");
+    const shop = await prepare(f);
+    const checkout = await f.buyer.request(`/shops/${shop.slug}/orders`, {
+      revision: shop.published.revision,
+      requestKey: "pickup-block-test",
+      lines: [{ sku: "MUG-BLU", quantity: 1 }],
+    });
+    assert.equal(checkout.status, 200);
+    const { id, provider } = checkout.data;
+    f.pp.get(provider).status = "APPROVED";
+    const captured = await f.buyer.request(`/orders/${id}/check`, {});
+    assert.equal(captured.data.state, "paid");
+    const day = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const start = day + "T10:00:00.000Z";
+    const end = day + "T11:00:00.000Z";
+    const closing = day + "T12:00:00.000Z";
+    const window = { start, end };
+    assert.equal(
+      (
+        await f.seller.request(`/incidents/${f.id}/pickup-availability`, {
+          day,
+          timezone: "UTC",
+          start,
+          end: closing,
+        })
+      ).status,
+      200,
+    );
+    assert.equal(
+      (await f.seller.request(`/orders/${id}/pickup-window`, window)).status,
+      200,
+    );
+    const path = `/orders/${id}/pickup-blocks`;
+    const block = { operation: "add", window };
+    assert.equal(
+      (
+        await f.stranger.request(
+          path + "?access=" + order(f.db, id).token,
+          block,
+        )
+      ).status,
+      403,
+    );
+    assert.equal((await f.seller.request(path, block)).status, 403);
+    const added = await f.buyer.request(path, block);
+    assert.equal(added.status, 200);
+    assert.deepEqual(added.data, {
+      buyerPickupBlocks: [window],
+      pickupNeedsReschedule: true,
+    });
+    assert.equal(
+      (await f.buyer.request(path, block)).data.buyerPickupBlocks.length,
+      1,
+    );
+    const receipt = await f.buyer.request(`/orders/${id}`);
+    assert.deepEqual(receipt.data.pickupWindow, window);
+    assert.deepEqual(receipt.data.buyerPickupBlocks, [window]);
+    const sellerOrders = await f.seller.request(`/orders?incident=${f.id}`);
+    assert.equal(sellerOrders.data[0].pickupNeedsReschedule, true);
+    assert.equal(
+      matchesOrderFilter(sellerOrders.data[0], "Needs attention"),
+      true,
+    );
+    assert.equal(sellerOrders.data[0].buyerPickupBlocks, undefined);
+    assert.equal(
+      (await f.seller.request(`/orders/${id}/pickup-window`, window)).status,
+      409,
+    );
+    const suggestion = await f.seller.request(
+      `/orders/${id}/pickup-suggestion`,
+      { from: start, minutes: 20 },
+    );
+    assert.equal(suggestion.data.start, end);
+    const plan = await f.seller.request(`/incidents/${f.id}/agent-operations`, {
+      goal: "pickups",
+      from: start,
+    });
+    assert.equal(
+      plan.data.pickups.find((pickup: any) => pickup.orderId === id).start,
+      end,
+    );
+    const saved = await f.seller.request(`/orders/${id}/pickup-window`, {
+      start: suggestion.data.start,
+      end: suggestion.data.end,
+      expected: window,
+    });
+    assert.equal(saved.status, 200);
+    assert.equal(saved.data.pickupNeedsReschedule, false);
+    assert.equal(matchesOrderFilter(saved.data, "Needs attention"), false);
+    assert.deepEqual(
+      (await f.buyer.request(path, { operation: "remove", window })).data
+        .buyerPickupBlocks,
+      [],
+    );
+    assert.equal(order(f.db, id).capture, captured.data.capture);
+  } finally {
+    await f.close();
+  }
+});
+
+test("New shops track first publication and visits separately for each buyer", async () => {
+  const f = await fixture();
+  try {
+    assert.equal((await f.buyer.request("/buyer/new-shops")).status, 403);
+    await registerBuyer(f.buyer, "early-buyer");
+    const shop = await prepare(f);
+    const firstPublishedAt = incident(f.db, f.id).firstPublishedAt;
+    assert.ok(firstPublishedAt);
+    const notifications = "/buyer/new-shops";
+    assert.deepEqual((await f.buyer.request(notifications)).data, [
+      { slug: shop.slug, name: "Sunday Studio" },
+    ]);
+    await registerBuyer(f.stranger, "late-buyer");
+    publish(f.db, f.id, shop.revision);
+    assert.equal(incident(f.db, f.id).firstPublishedAt, firstPublishedAt);
+    assert.deepEqual((await f.stranger.request(notifications)).data, []);
+    await f.buyer.request("/shops");
+    assert.equal((await f.buyer.request(notifications)).data.length, 1);
+    const visit = `/shops/${shop.slug}/visit`;
+    assert.equal((await f.buyer.request(visit, {}, "POST", false)).status, 403);
+    assert.equal((await f.buyer.request(visit, {})).status, 200);
+    assert.equal((await f.buyer.request(visit, {})).status, 200);
+    assert.deepEqual((await f.buyer.request(notifications)).data, []);
+    assert.equal(
+      f.db.prepare("SELECT count(*) n FROM rc_shop_visits").get()?.n,
+      1,
+    );
+  } finally {
     await f.close();
   }
 });

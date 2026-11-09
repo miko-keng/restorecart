@@ -51,8 +51,12 @@ export const status = () => ({
 });
 export const aiAllowance = (db: DB, owner: string) =>
   allowance(db, owner, config().ai);
-export function claimGeminiCall(db: DB, incidentId: string) {
-  claim(db, quotaOwner(db, incidentId), config().ai);
+export function claimGeminiCall(
+  db: DB,
+  incidentId: string,
+  accountId?: string,
+) {
+  claim(db, accountId ?? quotaOwner(db, incidentId), config().ai);
   calls++;
 }
 export async function reconstruct(

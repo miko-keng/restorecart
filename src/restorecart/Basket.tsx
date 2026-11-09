@@ -55,7 +55,10 @@ export function Basket(p: Props) {
             {basket?.units || 0} items · {money(basket?.total || 0)} USD
           </p>
         </div>
-        <a href="/restorecart/shops">Continue shopping →</a>
+        <nav className="rc-buttonrow" aria-label="Shopping and orders">
+          <a href="/restorecart/account">Your orders</a>
+          <a href="/restorecart/shops">Continue shopping →</a>
+        </nav>
       </div>
       {error && <p role="alert">{error}</p>}
       {!basket && !error ? (

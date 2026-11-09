@@ -1,6 +1,6 @@
 import { Component, type ReactNode } from "react";
 export class OrderViewBoundary extends Component<
-  { children: ReactNode; onFallback?: () => void },
+  { children: ReactNode; onFallback?: () => void; fallback?: ReactNode },
   { failed: boolean }
 > {
   state = { failed: false };
@@ -8,18 +8,19 @@ export class OrderViewBoundary extends Component<
     return { failed: true };
   }
   render() {
-    return this.state.failed ? (
-      <p role="alert">
-        The order view could not load. A deployment may have updated its files.{" "}
-        <button type="button" onClick={this.props.onFallback}>
-          Show order details
-        </button>{" "}
-        <button type="button" onClick={() => window.location.reload()}>
-          Reload workspace
-        </button>
-      </p>
-    ) : (
-      this.props.children
-    );
+    return this.state.failed
+      ? (this.props.fallback ?? (
+          <p role="alert">
+            The order view could not load. A deployment may have updated its
+            files.{" "}
+            <button type="button" onClick={this.props.onFallback}>
+              Show order details
+            </button>{" "}
+            <button type="button" onClick={() => window.location.reload()}>
+              Reload workspace
+            </button>
+          </p>
+        ))
+      : this.props.children;
   }
 }

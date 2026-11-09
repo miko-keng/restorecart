@@ -57,6 +57,7 @@ export type Incident = {
     pickup: string;
     name: string;
   };
+  firstPublishedAt?: number;
   mode: string;
   run: any;
   created: number;

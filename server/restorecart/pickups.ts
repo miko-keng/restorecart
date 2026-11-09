@@ -16,6 +16,74 @@ const windowSchema = z
     end: z.string().datetime({ offset: true }),
   })
   .strict();
+export function buyerPickupBlocks(
+  db: DB,
+  id: string,
+): z.infer<typeof windowSchema>[] {
+  const row = db
+    .prepare("SELECT value FROM rc_meta WHERE key=?")
+    .get(`pickup-blocks:${id}`) as { value: string } | undefined;
+  return row ? JSON.parse(row.value) : [];
+}
+function overlaps(
+  start: number,
+  end: number,
+  window: z.infer<typeof windowSchema>,
+) {
+  return Date.parse(window.start) < end && Date.parse(window.end) > start;
+}
+export function pickupNeedsReschedule(db: DB, id: string) {
+  const appointment = pickupWindow(db, id);
+  return (
+    !!appointment &&
+    buyerPickupBlocks(db, id).some((window) =>
+      overlaps(
+        Date.parse(appointment.start),
+        Date.parse(appointment.end),
+        window,
+      ),
+    )
+  );
+}
+export function changeBuyerPickupBlock(
+  db: DB,
+  id: string,
+  buyerId: string,
+  input: unknown,
+) {
+  const change = z
+    .object({ operation: z.enum(["add", "remove"]), window: windowSchema })
+    .strict()
+    .parse(input);
+  const start = Date.parse(change.window.start),
+    end = Date.parse(change.window.end);
+  if (start >= end) fail("Choose an end time after the start.");
+  const window = {
+    start: new Date(start).toISOString(),
+    end: new Date(end).toISOString(),
+  };
+  return tx(db, () => {
+    if (order(db, id).buyer !== buyerId)
+      fail("Only the buyer who placed this order can edit these times.", 403);
+    eligible(db, id);
+    let blocks = buyerPickupBlocks(db, id).filter(
+      (block) => block.start !== window.start || block.end !== window.end,
+    );
+    if (change.operation === "add") {
+      if (end <= Date.now()) fail("Choose a time that has not already ended.");
+      blocks = blocks.filter((block) => Date.parse(block.end) > Date.now());
+      if (blocks.length >= 20)
+        fail("Remove a blocked time before adding another.");
+      blocks.push(window);
+    }
+    blocks.sort((a, b) => a.start.localeCompare(b.start));
+    db.prepare("INSERT OR REPLACE INTO rc_meta VALUES(?,?)").run(
+      `pickup-blocks:${id}`,
+      JSON.stringify(blocks),
+    );
+    return blocks;
+  });
+}
 function localDay(iso: string, timezone: string) {
   try {
     const parts = new Intl.DateTimeFormat("en-US", {
@@ -126,9 +194,10 @@ export function suggestPickupWindow(db: DB, id: string, input: unknown) {
     .parse(input);
   const o = eligible(db, id),
     availability = pickupAvailability(db, o.incident),
-    busy = activeAppointments(db, o.incident, id).sort(
-      (a, b) => Date.parse(a.start) - Date.parse(b.start),
-    );
+    busy = [
+      ...activeAppointments(db, o.incident, id),
+      ...buyerPickupBlocks(db, id),
+    ].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
   const earliest = Math.max(Date.parse(b.from), Date.now()),
     duration = b.minutes * 60000;
   for (const day of availability.days) {
@@ -201,6 +270,13 @@ export function savePickupWindow(
         .get(id)
     )
       fail("Schedule only paid, unrefunded orders awaiting collection.", 409);
+    if (
+      buyerPickupBlocks(db, id).some((window) => overlaps(start, end, window))
+    )
+      fail(
+        "The buyer marked this time unavailable. Choose another pickup window.",
+        409,
+      );
     const other = db
       .prepare(
         "SELECT id FROM rc_orders WHERE incident=? AND id!=? AND state='paid' AND refunded=0 AND fulfillment!='collected'",

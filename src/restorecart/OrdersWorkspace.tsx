@@ -3,7 +3,13 @@ import { OperationsChat } from "./OperationsChat";
 import { SampleOrderChat } from "./SampleOrderChat";
 import { SidePanel } from "./SidePanel";
 import { OrderProgress } from "./OrderProgress";
-import { matchesOrderFilter, sampleOrders } from "./orderExamples";
+import {
+  matchesOrderFilter,
+  pickupConflict,
+  sampleOrders,
+} from "./orderExamples";
+import { canSchedulePickup } from "./orderAdvice";
+import type { PickupRequest } from "./PickupSchedule";
 import { orderProgress } from "./orderStatus";
 import { OrderViewBoundary } from "./OrderViewBoundary";
 const OrderTable = lazy(() => import("./OrderTable"));
@@ -33,6 +39,7 @@ export function OrdersWorkspace({
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState(initialFilter),
     [view, setView] = useState("Table"),
+    [pickupRequest, setPickupRequest] = useState<PickupRequest | null>(null),
     [selected, setSelected] = useState(""),
     [assistant, setAssistant] = useState(false);
   const data = sample ? sampleOrders : orders;
@@ -43,6 +50,20 @@ export function OrdersWorkspace({
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
+  if (filter === "Needs attention")
+    visible.sort(
+      (a: any, b: any) => Number(pickupConflict(b)) - Number(pickupConflict(a)),
+    );
+  const attentionCount = data.filter((o: any) =>
+    matchesOrderFilter(o, "Needs attention"),
+  ).length;
+  function openPickup(id: string, proposal?: PickupRequest["proposal"]) {
+    setPickupRequest({ id, proposal });
+    setSelected("");
+    setFilter("All");
+    setSearch("");
+    setView("Pickup schedule");
+  }
   const order = data.find((o: any) => o.id === selected);
   return (
     <section className="rc-panel rc-orders-workspace">
@@ -57,6 +78,7 @@ export function OrdersWorkspace({
               onClick={() => {
                 setSample(value);
                 setSelected("");
+                setPickupRequest(null);
                 setAssistant(false);
                 setFilter("All");
                 setSearch("");
@@ -66,6 +88,24 @@ export function OrdersWorkspace({
             </button>
           ))}
         </div>
+        {!sample && (
+          <button
+            type="button"
+            className="rc-attention-toggle"
+            aria-pressed={view === "Table" && filter === "Needs attention"}
+            onClick={() => {
+              setSearch("");
+              setFilter(
+                view === "Table" && filter === "Needs attention"
+                  ? "All"
+                  : "Needs attention",
+              );
+              setView("Table");
+            }}
+          >
+            Needs attention <span>{attentionCount}</span>
+          </button>
+        )}
       </div>
       {sample && (
         <p className="rc-sample-notice">
@@ -73,28 +113,38 @@ export function OrdersWorkspace({
         </p>
       )}
       <div className="rc-orders-toolbar">
-        <input
-          type="search"
-          aria-label="Search orders"
-          placeholder="Search orders or items"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select
-          aria-label="Order status"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        >
-          {filters.map((f) => (
-            <option key={f} value={f}>
-              {f} ({data.filter((o: any) => matchesOrderFilter(o, f)).length})
-            </option>
-          ))}
-        </select>
+        {view === "Table" && (
+          <>
+            <input
+              type="search"
+              aria-label="Search orders"
+              placeholder="Search orders or items"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {filter !== "Needs attention" && (
+              <select
+                aria-label="Order status"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+              >
+                {filters.map((f) => (
+                  <option key={f} value={f}>
+                    {f} (
+                    {data.filter((o: any) => matchesOrderFilter(o, f)).length})
+                  </option>
+                ))}
+              </select>
+            )}
+          </>
+        )}
         <select
           aria-label="Order view"
           value={view}
-          onChange={(e) => setView(e.target.value)}
+          onChange={(e) => {
+            setPickupRequest(null);
+            setView(e.target.value);
+          }}
         >
           <option>Table</option>
           <option>Pickup schedule</option>
@@ -112,7 +162,7 @@ export function OrdersWorkspace({
             orders={orders}
             api={api}
             onPlan={onPlan}
-            onSaved={refresh}
+            onReviewPickup={openPickup}
             onOpenOrder={setSelected}
           />
         )}
@@ -124,7 +174,7 @@ export function OrdersWorkspace({
           Refresh
         </button>
       </div>
-      {!data.length ? (
+      {view === "Table" && !data.length ? (
         <div className="rc-orders-empty">
           <h3>No purchases yet</h3>
           <p>Completed checkouts will appear here.</p>
@@ -142,7 +192,7 @@ export function OrdersWorkspace({
             Try sample orders
           </button>
         </div>
-      ) : !visible.length ? (
+      ) : view === "Table" && !visible.length ? (
         <div className="rc-orders-empty">
           <h3>No matching orders</h3>
           <button
@@ -165,37 +215,53 @@ export function OrdersWorkspace({
               <>
                 <div className="rc-desktop-orders">
                   <OrderTable
-                    key={`${shop.id}:${sample}`}
-                    storageKey={`${userId}:${shop.id}:${sample}:compact-v2`}
+                    key={`${shop.id}:${sample}:${filter === "Needs attention"}`}
+                    storageKey={`${userId}:${shop.id}:${sample}:compact-v2:${filter === "Needs attention"}`}
                     orders={visible}
                     onSelect={setSelected}
+                    onOpenPickup={openPickup}
                     plan={sample ? null : plan}
                   />
                 </div>
                 <div className="rc-compact-mobile-orders">
                   {visible.map((o: any) => (
-                    <button key={o.id} onClick={() => setSelected(o.id)}>
-                      <strong>
-                        {o.sample
-                          ? o.id.replace("sample-order-", "Sample ")
-                          : o.id.slice(-8)}
-                      </strong>
-                      <span>
-                        {o.snapshot.lines
-                          .map((l: any) => `${l.quantity} × ${l.name}`)
-                          .join(", ")}
-                      </span>
-                      <span>
-                        {orderProgress(o).label} · $
-                        {(o.amount / 100).toFixed(2)}
-                      </span>
-                    </button>
+                    <div key={o.id} className="rc-mobile-order-actions">
+                      <button onClick={() => setSelected(o.id)}>
+                        <strong>
+                          {o.sample
+                            ? o.id.replace("sample-order-", "Sample ")
+                            : o.id.slice(-8)}
+                        </strong>
+                        <span>
+                          {o.snapshot.lines
+                            .map((l: any) => `${l.quantity} × ${l.name}`)
+                            .join(", ")}
+                        </span>
+                        <span>
+                          {orderProgress(o).label} · $
+                          {(o.amount / 100).toFixed(2)}
+                        </span>
+                      </button>
+                      {canSchedulePickup(o) &&
+                        (!o.pickupWindow || pickupConflict(o)) && (
+                          <button
+                            type="button"
+                            className="rc-pickup-conflict-link"
+                            onClick={() => openPickup(o.id)}
+                          >
+                            {o.pickupWindow
+                              ? "Reschedule pickup"
+                              : "Schedule pickup"}
+                          </button>
+                        )}
+                    </div>
                   ))}
                 </div>
               </>
             ) : (
               <PickupSchedule
-                orders={visible}
+                orders={data}
+                request={pickupRequest}
                 shopId={shop.id}
                 api={sample ? undefined : api}
                 onSelect={setSelected}
@@ -224,7 +290,7 @@ export function OrdersWorkspace({
               <small>Sample only. No payment or inventory changes.</small>
             </>
           ) : (
-            renderOrder(order)
+            renderOrder(order, openPickup)
           ))}
       </SidePanel>
       <SidePanel

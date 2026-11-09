@@ -1,7 +1,20 @@
 import { orderProgress, orderSteps, type TrackableOrder } from "./orderStatus";
+const pickupDate = new Intl.DateTimeFormat(undefined, {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+export function pickupTimeLabel(window: { start: string; end: string }) {
+  return pickupDate.formatRange(new Date(window.start), new Date(window.end));
+}
+
 export function OrderProgress({
   order,
+  compact = false,
 }: {
+  compact?: boolean;
   order: TrackableOrder & {
     pickupWindow?: { start: string; end: string } | null;
   };
@@ -14,15 +27,11 @@ export function OrderProgress({
       aria-live="polite"
     >
       <h3>{status.label}</h3>
-      <p>{status.description}</p>
+      {!compact && <p>{status.description}</p>}
       {order.pickupWindow && (
-        <p>
-          Pickup appointment:{" "}
-          {new Date(order.pickupWindow.start).toLocaleString()} –{" "}
-          {new Date(order.pickupWindow.end).toLocaleTimeString()}
-        </p>
+        <p>Pickup · {pickupTimeLabel(order.pickupWindow)}</p>
       )}
-      {status.step >= 0 && (
+      {!compact && status.step >= 0 && (
         <ol>
           {orderSteps.map((s, i) => (
             <li

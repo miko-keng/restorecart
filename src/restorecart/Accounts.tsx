@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { OrderProgress } from "./OrderProgress";
+import { pickupTimeLabel } from "./OrderProgress";
+import { orderProgress } from "./orderStatus";
 
 type Props = {
   api: (path: string, body?: any, method?: string) => Promise<any>;
@@ -123,19 +124,17 @@ export function AccountForm(p: Props) {
   );
 }
 export function BuyerAccount(p: Props & { user: any }) {
-  const [orders, setOrders] = useState<any[]>([]),
-    [carts, setCarts] = useState<any[]>([]),
+  const [orders, setOrders] = useState<any[] | null>(null),
     [error, setError] = useState("");
   useEffect(() => {
     if (!p.user) return;
     let alive = true;
     const refresh = () => {
       if (document.visibilityState === "hidden") return;
-      Promise.all([p.api("/my-orders"), p.api("/my-carts")])
-        .then(([orders, carts]) => {
+      p.api("/my-orders")
+        .then((orders) => {
           if (alive) {
             setOrders(orders);
-            setCarts(carts);
             setError("");
           }
         })
@@ -155,45 +154,73 @@ export function BuyerAccount(p: Props & { user: any }) {
     };
   }, [p.user?.id]);
   return (
-    <main className="rc-account-page">
+    <main
+      className={
+        p.user ? "rc-account-page rc-buyer-orders-page" : "rc-account-page"
+      }
+    >
       {p.user ? (
         <>
-          <span className="rc-eyebrow">YOUR ACCOUNT</span>
-          <h1>Your orders</h1>
-          <p>{p.user.email}</p>
-          <a className="rc-button" href="/restorecart/shops">
-            Continue shopping →
-          </a>
-          {p.user.role === "seller" && (
-            <p>
-              <a href="/restorecart/seller">Open your seller workspace →</a>
-            </p>
-          )}
-          <h2>Your purchases</h2>
-          <p>
-            Pickup status updates automatically every 15 seconds. This prototype
-            supports collection, not delivery tracking.
-          </p>
+          <header className="rc-buyer-orders-heading">
+            <h1>Your orders</h1>
+            <a href="/restorecart/shops">Continue shopping →</a>
+            {p.user.role === "seller" && (
+              <a href="/restorecart/seller">Seller workspace →</a>
+            )}
+          </header>
           {error && <p role="alert">{error}</p>}
-          {orders.length ? (
-            orders.map((o) => (
-              <article className="rc-panel" key={o.id}>
-                <h3>{o.shopName}</h3>
-                <OrderProgress order={o} />
-                <p>
-                  {o.state} · {o.fulfillment} · ${(o.amount / 100).toFixed(2)}{" "}
-                  USD
-                  {o.refunded > 0
-                    ? ` · Refunded $${(o.refunded / 100).toFixed(2)}`
-                    : ""}
-                </p>
-                <a href={o.receiptUrl}>View order {o.id.slice(-8)} →</a>
-              </article>
-            ))
+          {orders === null ? (
+            !error && <p role="status">Loading orders…</p>
+          ) : orders.length ? (
+            <section
+              className="rc-buyer-order-ledger"
+              aria-label="Order history"
+            >
+              <div className="rc-buyer-order-columns" aria-hidden="true">
+                <span>Order</span>
+                <span>Status</span>
+                <span>Pickup</span>
+                <span>Total</span>
+                <span />
+              </div>
+              <ul>
+                {orders.map((order) => (
+                  <li key={order.id}>
+                    <a className="rc-buyer-order-row" href={order.receiptUrl}>
+                      <span className="rc-buyer-order-name">
+                        <span className="rc-sr">
+                          View order {order.id.slice(-8)} from{" "}
+                        </span>
+                        <strong>{order.shopName}</strong>
+                        <small>
+                          {order.items
+                            ?.map(
+                              (item: any) => `${item.quantity} × ${item.name}`,
+                            )
+                            .join(", ") || `Order ${order.id.slice(-8)}`}
+                        </small>
+                      </span>
+                      <span className="rc-buyer-order-status">
+                        {orderProgress(order).label}
+                      </span>
+                      <span className="rc-buyer-order-time">
+                        {order.pickupWindow
+                          ? pickupTimeLabel(order.pickupWindow)
+                          : "Not scheduled"}
+                      </span>
+                      <strong className="rc-buyer-order-total">
+                        ${(order.amount / 100).toFixed(2)}
+                      </strong>
+                      <span className="rc-buyer-order-arrow" aria-hidden="true">
+                        →
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ) : (
-            <p>
-              No purchases yet. Your orders will appear here after checkout.
-            </p>
+            <p>No orders yet.</p>
           )}
         </>
       ) : (

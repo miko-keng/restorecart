@@ -1,7 +1,12 @@
+import { searchAsBuyer } from "./buyerSearch";
 import { paymentHistory } from "./paymentHistory";
 import { AGENT_ROLES } from "./agentRuntime";
 import { reconstructWithAgents, agentProgress } from "./agentCoordinator";
-import { planOperations, decideOperation } from "./operationsAgent";
+import {
+  planOperations,
+  planRecovery,
+  decideOperation,
+} from "./operationsAgent";
 import {
   mountPayPalConnections,
   paymentDestination,
@@ -12,6 +17,9 @@ import { workerEvent, workerStatus } from "./diagnostics";
 import { prepareDemoShop } from "./demo";
 import {
   pickupWindow,
+  buyerPickupBlocks,
+  changeBuyerPickupBlock,
+  pickupNeedsReschedule,
   savePickupWindow,
   pickupAvailability,
   savePickupAvailability,
@@ -31,6 +39,8 @@ import { mountContinuity, readiness, meta } from "./continuity";
 import {
   productCategories,
   shopDescription,
+  type DirectoryProduct,
+  type DirectoryShop,
 } from "../../src/restorecart/directory";
 import express from "express";
 import { randomBytes } from "node:crypto";
@@ -42,6 +52,7 @@ import {
   uid,
   candidateSchema,
   type Product,
+  type Incident,
   salesReportCSV,
 } from "./domain";
 import {
@@ -73,6 +84,7 @@ export function createApp(
     testPassword?: string;
     trustedProxyHops?: number;
     wooTransport?: WooTransport;
+    buyerSearchTransport?: typeof fetch;
   } = {},
 ) {
   if (process.env.PAYPAL_ENV && process.env.PAYPAL_ENV !== "sandbox")
@@ -200,6 +212,11 @@ export function createApp(
   );
   mountContinuity(router, db, seller, asyncRoute);
   const parseId = (req: express.Request, key = "id") => String(req.params[key]);
+  function signedInBuyer(res: express.Response) {
+    const user = userFor(db, res.locals.session);
+    if (user?.role !== "buyer") fail("Sign in as a buyer to continue.", 403);
+    return user.id as string;
+  }
   function readable(req: express.Request, res: express.Response) {
     const o = order(db, parseId(req));
     if (
@@ -220,6 +237,7 @@ export function createApp(
       state: o.state,
       fulfillment: o.fulfillment,
       pickupWindow: pickupWindow(db, o.id),
+      pickupNeedsReschedule: pickupNeedsReschedule(db, o.id),
       amount: o.amount,
       refunded: o.refunded,
       provider: o.provider,
@@ -501,63 +519,105 @@ export function createApp(
       res.json(viewIncident(db, parseId(req)));
     }),
   );
+  function publicShops(): DirectoryShop[] {
+    return (
+      db.prepare("SELECT body FROM rc_incidents ORDER BY rowid DESC").all() as {
+        body: string;
+      }[]
+    )
+      .map((row) => JSON.parse(row.body) as Incident)
+      .filter((i) => i.state === "live" && i.published !== null)
+      .map((i) => {
+        const published = i.published!;
+        const products: DirectoryProduct[] = published.products.map((p) => ({
+          sku: p.sku,
+          name: p.name,
+          description: p.description,
+          price: p.price,
+          currency: p.currency,
+          imageSourceId: p.imageSourceId,
+          categories: productCategories(p),
+          available: available(
+            db,
+            i.id,
+            p.sku,
+            i.products.find((v) => v.sku === p.sku)?.allocation || 0,
+          ),
+        }));
+        const stocked = products.filter((product) => product.available > 0);
+        const preview = stocked[0] || products[0];
+        return {
+          slug: i.slug,
+          name: published.name,
+          description: shopDescription(products),
+          categories: [...new Set(products.flatMap((p) => p.categories))],
+          products,
+          productCount: products.length,
+          availableProductCount: stocked.length,
+          preview: preview
+            ? {
+                sku: preview.sku,
+                name: preview.name,
+                imageSourceId: preview.imageSourceId,
+              }
+            : null,
+        };
+      });
+  }
   router.get(
     "/shops",
     asyncRoute((_req, res) => {
       expire(db);
-      const shops = (
-        db
-          .prepare("SELECT body FROM rc_incidents ORDER BY rowid DESC")
-          .all() as any[]
-      )
-        .map((row) => JSON.parse(row.body))
-        .filter((i) => i.state === "live" && i.published)
-        .map((i) => {
-          const products = i.published.products.map((p: any) => ({
-            sku: p.sku,
-            name: p.name,
-            description: p.description,
-            price: p.price,
-            currency: p.currency,
-            imageSourceId: p.imageSourceId,
-            categories: productCategories(p),
-            available: available(
-              db,
-              i.id,
-              p.sku,
-              i.products.find((v: any) => v.sku === p.sku)?.allocation || 0,
-            ),
-          }));
-          const stocked = products.filter(
-            (p: any) =>
-              available(
-                db,
-                i.id,
-                p.sku,
-                i.products.find((v: any) => v.sku === p.sku)?.allocation || 0,
-              ) > 0,
-          );
-          const preview = stocked[0] || products[0];
-          return {
-            slug: i.slug,
-            name: i.published.name,
-            description: shopDescription(products),
-            categories: [
-              ...new Set(products.flatMap((p: any) => p.categories)),
-            ],
-            products,
-            productCount: products.length,
-            availableProductCount: stocked.length,
-            preview: preview
-              ? {
-                  sku: preview.sku,
-                  name: preview.name,
-                  imageSourceId: preview.imageSourceId,
-                }
-              : null,
-          };
-        });
+      res.json(publicShops());
+    }),
+  );
+  router.post(
+    "/buyer/search-agent",
+    asyncRoute(async (req, res) => {
+      res.json(
+        await searchAsBuyer(
+          db,
+          signedInBuyer(res),
+          req.body,
+          publicShops,
+          options.buyerSearchTransport,
+        ),
+      );
+    }),
+  );
+  router.get(
+    "/buyer/new-shops",
+    asyncRoute((_req, res) => {
+      const buyerId = signedInBuyer(res);
+      const joined = meta(db, `buyer-joined:${buyerId}`, 0);
+      const shops = db
+        .prepare(
+          `SELECT json_extract(body,'$.slug') AS slug, json_extract(body,'$.published.name') AS name
+       FROM rc_incidents
+       WHERE json_extract(body,'$.state')='live'
+         AND json_extract(body,'$.published') IS NOT NULL
+         AND COALESCE(json_extract(body,'$.sampleShop'), 0)=0
+         AND json_extract(body,'$.firstPublishedAt') >= ?
+         AND NOT EXISTS (SELECT 1 FROM rc_shop_visits WHERE account_id=? AND shop_id=rc_incidents.id)
+       ORDER BY json_extract(body,'$.firstPublishedAt') DESC, id`,
+        )
+        .all(joined, buyerId);
       res.json(shops);
+    }),
+  );
+  router.post(
+    "/shops/:slug/visit",
+    asyncRoute((req, res) => {
+      const buyerId = signedInBuyer(res);
+      const row = db
+        .prepare("SELECT id FROM rc_incidents WHERE slug=?")
+        .get(parseId(req, "slug")) as { id: string } | undefined;
+      if (!row || !incident(db, row.id).published) fail("Shop not found.", 404);
+      db.prepare("INSERT OR IGNORE INTO rc_shop_visits VALUES(?,?)").run(
+        buyerId,
+        row.id,
+      );
+      res.json({ visited: true });
     }),
   );
   router.get(
@@ -692,6 +752,13 @@ export function createApp(
     }),
   );
   router.post(
+    "/incidents/:id/agent-recovery",
+    seller,
+    asyncRoute(async (req, res) => {
+      res.json(await planRecovery(db, parseId(req), req.body));
+    }),
+  );
+  router.post(
     "/incidents/:id/agent-operations/decision",
     seller,
     asyncRoute(async (req, res) => {
@@ -713,7 +780,32 @@ export function createApp(
   });
   router.get(
     "/orders/:id",
-    asyncRoute((req, res) => res.json(publicOrder(readable(req, res)))),
+    asyncRoute((req, res) => {
+      const o = readable(req, res);
+      const user = userFor(db, res.locals.session);
+      res.json({
+        ...publicOrder(o),
+        ...(user?.role === "buyer" && user.id === o.buyer
+          ? { buyerPickupBlocks: buyerPickupBlocks(db, o.id) }
+          : {}),
+      });
+    }),
+  );
+  router.post(
+    "/orders/:id/pickup-blocks",
+    asyncRoute((req, res) => {
+      const id = parseId(req);
+      const blocks = changeBuyerPickupBlock(
+        db,
+        id,
+        signedInBuyer(res),
+        req.body,
+      );
+      res.json({
+        buyerPickupBlocks: blocks,
+        pickupNeedsReschedule: pickupNeedsReschedule(db, id),
+      });
+    }),
   );
   router.post(
     "/orders/:id/check",

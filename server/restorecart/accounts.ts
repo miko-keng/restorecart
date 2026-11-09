@@ -10,6 +10,7 @@ export function accountTables(db: DB) {
   db.exec(`CREATE TABLE IF NOT EXISTS rc_accounts(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,username TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,role TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS rc_session_accounts(session_id TEXT PRIMARY KEY,account_id TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS rc_owners(kind TEXT NOT NULL,id TEXT NOT NULL,account_id TEXT NOT NULL,PRIMARY KEY(kind,id));
+  CREATE TABLE IF NOT EXISTS rc_shop_visits(account_id TEXT NOT NULL,shop_id TEXT NOT NULL,PRIMARY KEY(account_id,shop_id));
   CREATE TABLE IF NOT EXISTS rc_carts(owner TEXT NOT NULL,slug TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(owner,slug));`);
 }
 export function passwordDigest(password: string) {
@@ -166,13 +167,20 @@ export function registerAccount(db: DB, input: unknown) {
     username: b.username,
     role: b.role,
   };
-  db.prepare("INSERT INTO rc_accounts VALUES(?,?,?,?,?)").run(
-    user.id,
-    email,
-    user.username,
-    passwordDigest(b.password),
-    user.role,
-  );
+  tx(db, () => {
+    db.prepare("INSERT INTO rc_accounts VALUES(?,?,?,?,?)").run(
+      user.id,
+      email,
+      user.username,
+      passwordDigest(b.password),
+      user.role,
+    );
+    if (user.role === "buyer")
+      db.prepare("INSERT INTO rc_meta VALUES(?,?)").run(
+        `buyer-joined:${user.id}`,
+        String(Date.now()),
+      );
+  });
   return user;
 }
 export function mountAccounts(
@@ -425,6 +433,12 @@ export function mountAccounts(
         rows.map(({ token, body, ...o }) => ({
           ...o,
           shopName: incident(db, o.incident).name,
+          items: (JSON.parse(body).lines || []).map(
+            ({ name, quantity }: { name: string; quantity: number }) => ({
+              name,
+              quantity,
+            }),
+          ),
           pickupWindow: pickupWindow(db, o.id),
           receiptUrl: `/restorecart/receipt/${o.id}?access=${token}`,
         })),

@@ -1,3 +1,4 @@
+import { canSchedulePickup } from "./orderAdvice";
 import { SidePanel } from "./SidePanel";
 import { OrdersWorkspace } from "./OrdersWorkspace";
 import { ReopeningChecklist } from "./ReopeningChecklist";
@@ -16,7 +17,8 @@ import { GeminiReview } from "./GeminiReview";
 import { WooCommercePanel } from "./WooCommercePanel";
 import { useProductDraft } from "./useProductDraft";
 import { canRefundOrder } from "./orderStatus";
-import { OrderProgress } from "./OrderProgress";
+import { pickupTimeLabel } from "./OrderProgress";
+import { orderProgress } from "./orderStatus";
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "motion/react";
 import {
@@ -924,12 +926,13 @@ export function SellerWorkspace(p: Props) {
                 onPlan={setOperationsPlan}
                 userId={p.session.user?.id}
                 initialFilter={filter}
-                renderOrder={(o: any) => (
+                renderOrder={(o: any, openPickup: (id: string) => void) => (
                   <SellerOrder
                     order={o}
                     shop={shop}
                     p={p}
                     refreshed={refreshOrders}
+                    openPickup={openPickup}
                   />
                 )}
               />
@@ -1687,76 +1690,33 @@ function ShopDetails({ p, contact, saved }: any) {
     </section>
   );
 }
-function SellerOrder({ order: o, shop, p, refreshed }: any) {
+function SellerOrder({ order: o, shop, p, refreshed, openPickup }: any) {
   const [help, setHelp] = useState<any>(null),
     [confirmRefund, setConfirmRefund] = useState(false),
     [confirmStock, setConfirmStock] = useState(false);
   const blocked = o.refund?.state === "checking";
   return (
     <article className="rc-order">
-      <PaymentTimeline order={o} />
       <div className="rc-orderhead">
-        <h3>{money(o.amount)}</h3>
-        <b>{o.state.replaceAll("_", " ")}</b>
-        <span>{o.fulfillment.replaceAll("_", " ")}</span>
-        <small>{o.id.slice(-8)}</small>
+        <h3>Order {o.id.slice(-8)}</h3>
+        <strong>{money(o.amount)}</strong>
       </div>
+      <p className="rc-buyer-order-status">{orderProgress(o).label}</p>
       <p>
         {o.snapshot.lines
           .map((l: any) => `${l.quantity} × ${l.name}`)
           .join(" · ")}
       </p>
-      {o.pickupWindow && (
-        <p>
-          Pickup appointment: {new Date(o.pickupWindow.start).toLocaleString()}{" "}
-          – {new Date(o.pickupWindow.end).toLocaleTimeString()}
-        </p>
+      {o.pickupWindow && <p>Pickup · {pickupTimeLabel(o.pickupWindow)}</p>}
+      {canSchedulePickup(o) && (
+        <button
+          type="button"
+          className="rc-link"
+          onClick={() => openPickup(o.id)}
+        >
+          {o.pickupWindow ? "View pickup in schedule →" : "Schedule pickup →"}
+        </button>
       )}
-      {o.state === "paid" &&
-        !o.refunded &&
-        !blocked &&
-        o.fulfillment !== "collected" && (
-          <details>
-            <summary>Schedule pickup time</summary>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const f = new FormData(e.currentTarget);
-                void p.run("Saving pickup appointment", async () => {
-                  const start = new Date(String(f.get("pickupStart"))),
-                    end = new Date(String(f.get("pickupEnd")));
-                  if (
-                    !Number.isFinite(start.getTime()) ||
-                    !Number.isFinite(end.getTime())
-                  )
-                    throw Error("Enter valid pickup dates and times.");
-                  await p.api(`/orders/${o.id}/pickup-window`, {
-                    start: start.toISOString(),
-                    end: end.toISOString(),
-                    expected: o.pickupWindow || null,
-                  });
-                  await refreshed();
-                });
-              }}
-            >
-              <label>
-                Pickup starts
-                <input name="pickupStart" type="datetime-local" required />
-              </label>
-              <label>
-                Pickup ends
-                <input name="pickupEnd" type="datetime-local" required />
-              </label>
-              <button className="rc-button secondary" disabled={!!p.busy}>
-                Save pickup appointment
-              </button>
-            </form>
-            <p>
-              One pickup counter. Overlapping appointments are rejected. Save a
-              time, then open Pickup schedule to see it.
-            </p>
-          </details>
-        )}
       {o.refunded > 0 && (
         <p>Refunded {money(o.refunded)}. Stock is restored separately.</p>
       )}
@@ -1767,35 +1727,6 @@ function SellerOrder({ order: o, shop, p, refreshed }: any) {
         </p>
       )}
       <div className="rc-buttonrow">
-        <button
-          className="rc-button secondary"
-          disabled={!!p.busy}
-          onClick={() =>
-            p.run("Checking PayPal status", async () => {
-              await p.api(`/orders/${o.id}/check`, {});
-              setHelp(null);
-              await refreshed();
-            })
-          }
-        >
-          Check PayPal again
-        </button>
-        <button
-          className="rc-link"
-          disabled={!!p.busy}
-          onClick={() =>
-            p.run("Gemini is explaining the recorded status", async () =>
-              setHelp(
-                await p.api(`/incidents/${shop.id}/payment-help`, {
-                  orderId: o.id,
-                }),
-              ),
-            )
-          }
-        >
-          <Sparkles size={16} />
-          Explain with Gemini
-        </button>
         {o.state === "paid" &&
           !o.refunded &&
           !blocked &&
@@ -1818,20 +1749,64 @@ function SellerOrder({ order: o, shop, p, refreshed }: any) {
             </button>
           )}
       </div>
-      {help && (
-        <div className="rc-ai-review">
-          <b>
-            Recorded status: {help.facts.state} ·{" "}
-            {money(help.facts.amount - help.facts.refunded)} net
-          </b>
-          <p>{help.explanation}</p>
-          <p>Suggested next step: {help.nextAction.replaceAll("_", " ")}</p>
-          <small>
-            {help.uncertainty} Gemini cannot change payment status or issue a
-            refund.
-          </small>
+      <details
+        open={
+          blocked ||
+          ["pending", "capture_requested", "needs_reconciliation"].includes(
+            o.state,
+          )
+            ? true
+            : undefined
+        }
+      >
+        <summary>Payments &amp; history</summary>
+        <div className="rc-buttonrow">
+          <button
+            className="rc-button secondary"
+            disabled={!!p.busy}
+            onClick={() =>
+              p.run("Checking PayPal status", async () => {
+                await p.api(`/orders/${o.id}/check`, {});
+                setHelp(null);
+                await refreshed();
+              })
+            }
+          >
+            Check PayPal again
+          </button>
+          <button
+            className="rc-link"
+            disabled={!!p.busy}
+            onClick={() =>
+              p.run("Gemini is explaining the recorded status", async () =>
+                setHelp(
+                  await p.api(`/incidents/${shop.id}/payment-help`, {
+                    orderId: o.id,
+                  }),
+                ),
+              )
+            }
+          >
+            <Sparkles size={16} />
+            Explain with Gemini
+          </button>
         </div>
-      )}
+        <PaymentTimeline order={o} />
+        {help && (
+          <div className="rc-ai-review">
+            <b>
+              Recorded status: {help.facts.state} ·{" "}
+              {money(help.facts.amount - help.facts.refunded)} net
+            </b>
+            <p>{help.explanation}</p>
+            <p>Suggested next step: {help.nextAction.replaceAll("_", " ")}</p>
+            <small>
+              {help.uncertainty} Gemini cannot change payment status or issue a
+              refund.
+            </small>
+          </div>
+        )}
+      </details>
       {canRefundOrder(o) && (
         <details>
           <summary>Refund options</summary>

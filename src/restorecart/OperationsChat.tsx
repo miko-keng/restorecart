@@ -1,3 +1,4 @@
+import type { PickupRequest } from "./PickupSchedule";
 import { useEffect, useId, useRef, useState } from "react";
 import { MessageCircle, Send, X, Sparkles } from "lucide-react";
 import { allowedOrderActions } from "./orderAdvice";
@@ -7,7 +8,7 @@ type Props = {
   api: (path: string, body?: any) => Promise<any>;
   onPlan: (plan: any) => void;
   onOpenOrder: (id: string) => void;
-  onSaved: () => Promise<void>;
+  onReviewPickup: (id: string, proposal?: PickupRequest["proposal"]) => void;
 };
 type Message = {
   id: number;
@@ -21,7 +22,7 @@ export function OperationsChat({
   api,
   onPlan,
   onOpenOrder,
-  onSaved,
+  onReviewPickup,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null),
     titleId = useId(),
@@ -43,6 +44,7 @@ export function OperationsChat({
       o.refunded,
       o.fulfillment,
       o.pickupWindow,
+      o.pickupNeedsReschedule,
       o.refund,
     ]),
   ]);
@@ -59,7 +61,10 @@ export function OperationsChat({
   useEffect(() => {
     feed.current?.scrollTo({ top: feed.current.scrollHeight });
   }, [messages, decisions, busy]);
-  async function ask(text: string, goal = "orders") {
+  async function ask(
+    text: string,
+    goal = /\brecover(?:y|ing)?\b/i.test(text) ? "recovery" : "orders",
+  ) {
     if (busy || !text.trim()) return;
     const requestVersion = versionRef.current;
     setError("");
@@ -73,11 +78,14 @@ export function OperationsChat({
       { id: ++serial.current, role: "user", text },
     ]);
     try {
-      const plan = await api(`/incidents/${shopId}/agent-operations`, {
-        message: text,
-        conversation,
-        goal,
-      });
+      const plan =
+        goal === "recovery"
+          ? await api(`/incidents/${shopId}/agent-recovery`, { message: text })
+          : await api(`/incidents/${shopId}/agent-operations`, {
+              message: text,
+              conversation,
+              goal,
+            });
       if (versionRef.current !== requestVersion)
         throw Error(
           "Orders changed while Gemini was planning. Ask again for current suggestions.",
@@ -91,8 +99,10 @@ export function OperationsChat({
           plan,
         },
       ]);
-      setCurrent(plan.agentRunId);
-      onPlan(plan);
+      if (goal !== "recovery") {
+        setCurrent(plan.agentRunId);
+        onPlan(plan);
+      }
     } catch (e) {
       setError(
         e instanceof Error
@@ -120,7 +130,6 @@ export function OperationsChat({
         ...d,
         [`${plan.agentRunId}:${a.orderId}:${a.action}`]: result,
       }));
-      if (result.effect === "appointment_saved") await onSaved();
       if (result.effect === "open_order") {
         setOpen(false);
         onOpenOrder(a.orderId);
@@ -193,13 +202,51 @@ export function OperationsChat({
               <small>
                 {m.role === "user"
                   ? "You"
-                  : m.plan?.source === "gemini"
-                    ? "Gemini"
-                    : "Verified order rules"}
+                  : m.plan?.recoveryBlockers
+                    ? m.plan.source === "gemini"
+                      ? "Verified recovery checks · Gemini prioritized"
+                      : "Verified recovery checks"
+                    : m.plan?.source === "gemini"
+                      ? "Gemini"
+                      : "Verified order rules"}
                 {m.plan?.cached ? " · saved plan" : ""}
               </small>
               <p>{m.text}</p>
-              {m.plan?.actions.map((a: any) => {
+              {m.plan?.recoveryBlockers?.map(
+                (blocker: {
+                  orderId: string;
+                  kind: string;
+                  guidance: string;
+                }) => (
+                  <article
+                    className="rc-chat-suggestion"
+                    key={`${blocker.orderId}:${blocker.kind}`}
+                  >
+                    <strong>Order #{blocker.orderId.slice(-8)}</strong>
+                    <p>{blocker.guidance}</p>
+                    {orders.some((order) => order.id === blocker.orderId) && (
+                      <button
+                        type="button"
+                        className="rc-button secondary"
+                        onClick={() => {
+                          setOpen(false);
+                          onOpenOrder(blocker.orderId);
+                        }}
+                      >
+                        Open order
+                      </button>
+                    )}
+                  </article>
+                ),
+              )}
+              {m.plan?.recoveryBlockerCount >
+                m.plan?.recoveryBlockers?.length && (
+                <small>
+                  Showing the first {m.plan.recoveryBlockers.length} of{" "}
+                  {m.plan.recoveryBlockerCount} PayPal checks.
+                </small>
+              )}
+              {m.plan?.actions?.map((a: any) => {
                 const key = `${m.plan.agentRunId}:${a.orderId}:${a.action}`,
                   done = decisions[key],
                   o = orders.find((o) => o.id === a.orderId),
@@ -252,24 +299,29 @@ export function OperationsChat({
                       </small>
                     ) : (
                       <>
-                        <small>
-                          {a.action === "schedule_pickup"
-                            ? slot
-                              ? "Approve saves this exact pickup time to the buyer receipt."
-                              : "Add pickup opening dates and ask for a pickup plan first."
-                            : "Approve opens the order. Complete the task using its existing controls."}
-                        </small>
                         <div className="rc-chat-decisions">
-                          <button
-                            type="button"
-                            className="rc-button"
-                            disabled={
-                              busy || (a.action === "schedule_pickup" && !slot)
-                            }
-                            onClick={() => void decide(m.plan, a, "approve")}
-                          >
-                            Approve
-                          </button>
+                          {a.action === "schedule_pickup" ? (
+                            <button
+                              type="button"
+                              className="rc-button"
+                              disabled={busy}
+                              onClick={() => {
+                                setOpen(false);
+                                onReviewPickup(a.orderId, slot ?? undefined);
+                              }}
+                            >
+                              Review in schedule
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="rc-button"
+                              disabled={busy}
+                              onClick={() => void decide(m.plan, a, "approve")}
+                            >
+                              Approve
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="rc-button secondary"
@@ -312,6 +364,15 @@ export function OperationsChat({
             }
           >
             Plan pickups
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void ask("What’s blocking my shop recovery?", "recovery")
+            }
+          >
+            Check recovery
           </button>
         </div>
         <form

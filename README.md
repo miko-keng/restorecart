@@ -12,6 +12,19 @@ For the order demo, go to **Orders → Sample orders → Assistant → Play demo
 
 Use the [simple recording guide](docs/restorecart/RECORDED_SUBMISSION_GUIDE.md) for the seller-only video, or the [full-transaction rehearsal](DEMO_REHEARSAL_GUIDE.md) to test checkout and recovery.
 
+## Buyer features
+
+These features are available in the current source alongside the recorded seller flow. Sign in with a buyer account to try them.
+
+| Feature | How to try it | What RestoreCart checks |
+| --- | --- | --- |
+| **Buyer Search Agent** | Open **Ask RestoreCart** at the bottom right on any buyer page. Signed-out visitors can open it and use the sign-in link. Try “Find an in-stock mug under $25,” then ask a follow-up. The agent searches across shops and can shortlist real products or ask a clarifying question. Each result links separately to the product and its storefront. Checkout remains per shop. | Gemini uses a read-only published-catalog tool. The server verifies returned product IDs, prices, and stock filters against the current catalog. The agent has a per-account call allowance and uses the existing shared Gemini budget. Enable live AI with `npm run restorecart:ai:on` and configure `GEMINI_API_KEY` privately. The directory search and filters remain available without Gemini. |
+| **Order history and receipts** | Open **Your orders** to see the shop, items, status, pickup time, and total in one list. Select any row to open its receipt. The basket links to order history. | A buyer sees their own orders. **Manage pickup availability** groups the timeline and time-entry form. Payment references are under **Payment details**. |
+| **Buyer pickup blocks** | Open a paid order receipt and choose **Manage pickup availability**. Add a time range or block a whole day using your device’s time zone. In the seller’s **Pickup schedule**, an overlapping appointment is marked for rescheduling and stays visible until the seller changes it. | Only the buyer who placed the order can edit its blocked times. A receipt link alone does not grant edit access. Both the slot suggestion and appointment save check for overlaps. Sellers see the rescheduling flag without seeing the buyer’s full list of blocked times. When the Bryntum evaluation timeline is enabled, buyers can drag across the **Unavailable** row and choose **Confirm block**. The **Pickup** row shows their appointment, and saved blocks appear in the **Unavailable** row. The form is available for keyboard entry and whole-day blocks. |
+| **New shops** | After sign-in, look for the banner and **New shops** section in **Browse rescue shops**. Open a shop to mark it visited. Dismissing the banner on this browser leaves the section available. | Visits are stored per account. The list includes live, non-sample shops first published after the buyer joined. Editing or republishing does not reset the first publication date. For older accounts without a saved join date, it includes eligible shops with recorded publication dates. |
+
+[Buyer search agent](server/restorecart/buyerSearch.ts) · [Pickup rules](server/restorecart/pickups.ts) · [Buyer routes](server/restorecart/app.ts)
+
 ## PayPal seller-account limitation — current demo
 
 **In Shared demo mode, every completed sandbox checkout pays ONE configured PayPal sandbox business account, regardless of which RestoreCart seller or shop created the order.** Creating a RestoreCart seller account does not create or connect a separate PayPal account. Payments are not distributed to individual sellers, and this demo does not implement seller payouts. Sandbox transactions use test funds; no real money moves.
@@ -40,11 +53,26 @@ Pushing this repository to GitHub preserves source code and sample fixtures, **n
 
 ### Evidence and how to reproduce it
 
-- **Current automated verification:** 200 tests and the production build passed for the 7 November 2026 seller workspace update. Desktop and mobile browser checks covered the editor and sample Orders flow. Run `npm ci --include=dev`, then `npm test`. These tests use fixtures/controlled payment transports; passing them is not a new live PayPal transaction or proof of persistent Render hosting. [Current backend verification and measured AI results](docs/restorecart/BACKEND_VERIFICATION_2026_11.md).
+- **Current automated verification, 9 November 2026.** The full suite passed **204 of 204 tests**, with zero failures or skips. The production build passed with Bryntum enabled. The buyer tests cover verified search results and fallback, pickup authorization and rescheduling, and per-buyer shop visits across republishing. They use controlled Gemini and PayPal responses. Live provider calls and deployment of these additions were outside this run. [Buyer HTTP tests](tests/restorecart-http.test.ts)
+- **Pickup workflow browser check.** With Bryntum enabled, a buyer dragged and confirmed an unavailable range over an existing test appointment. The seller followed the AG Grid **Needs attention → Reschedule pickup** shortcut, found an available time and saved it. The conflict count returned to zero, and the replacement appeared on the buyer receipt. A separate drag check verified that a blue draft appeared at the proposed time before confirmation. These browser checks used isolated simulated orders without calling PayPal.
 - **Historical real sandbox E2E:** the documented local run used live Gemini and a $52 PayPal sandbox capture, followed by fulfillment, backup restoration and duplicate-safe local recovery. The historical 84-test count belongs to that earlier run. [Recorded E2E report](docs/restorecart/FINAL_E2E_REPORT.md).
 - **Local demonstration:** follow the [input/button rehearsal guide](DEMO_REHEARSAL_GUIDE.md) to show actual sandbox checkout, Orders, pickup tracking and recovery in one running session. Clearly identify Sample orders and saved Gemini replay. An edited demonstration should not imply simulated examples are actual payments.
 - **Submission video:** final public video link is pending. The recording should show the working flow and distinguish sample statuses, saved AI replay and actual sandbox purchases. No claim is made here that an unlinked video has already been reviewed.
 - **Historical hosted checkout verification:** implementation commit `85c9474` was deployed on 31 October 2026 and completed a real $52 PayPal sandbox capture, seller fulfillment, buyer pickup tracking and local-file recovery with zero repeat changes. [Hosted release report](docs/restorecart/HOSTED_RELEASE_REPORT.md). Webhook delivery was not independently observed in that journey; it used the verified server payment flow. That earlier deployment used temporary storage. The separate 4 November Turso/restart verification is historical; current hosting again uses temporary SQLite.
+
+From the repository root, run:
+
+```sh
+npm ci --include=dev
+npm test
+npm run build
+```
+
+For only the three buyer feature tests:
+
+```sh
+NODE_ENV=test PAYPAL_ALLOW_SHARED_DEMO=true node --import tsx --test --test-name-pattern="Buyer search agent|Buyer pickup blocks|New shops track" tests/restorecart-http.test.ts
+```
 
 WooCommerce is an optional seller-configured connector. Automated contract tests exist; real-store verification is pending. It is not required to run the supported local Original Store JSON v1 recovery demonstration. The optional Turso/libSQL adapter remains available through the [setup and migration guide](docs/restorecart/EXTERNAL_STORAGE.md), but is not active in the current deployment.
 
@@ -62,9 +90,9 @@ The backend now checks claims against the correct SKU record, withholds unsuppor
 
 Historical 4 November check, before disconnecting Turso: the local rehearsal data was preserved and migrated: all 24 original rows across 16 tables were compared unchanged. Separate application processes retained controlled order records, account/image data and recovery history; repeated recovery applied zero new changes. These are actual remote-database checks using controlled payment references. The hosted session, account and controlled order also survived an actual Render restart. [Persistence evidence](tests/evidence/restorecart-turso-persistence.json).
 
-## Three specialized Gemini roles
+## Gemini agents
 
-The coordinator conditionally hands work between three roles using one Gemini provider and key. **Catalog Agent** reads uploaded evidence and proposes products. **Conflict Investigator** inspects unresolved SKU records and asks targeted questions. **Operations Agent** inspects recorded orders and proposes allowed next actions and pickup slots. They run within bounded requests, rather than simultaneously on every click.
+Three seller agents use one Gemini provider and key. **Catalog Agent** reads uploaded evidence and proposes products. **Conflict Investigator** inspects unresolved SKU records and asks targeted questions. **Operations Agent** inspects recorded orders and proposes allowed next actions and pickup slots. The separate **Buyer Search Agent** searches published shops with its own bounded tool calls.
 
 Server evidence checks, verified payment state, availability constraints and seller approval remain authoritative. Agents cannot publish, confirm physical stock, charge/refund or save appointments. The separate general-purpose second checker remains off; the specialized Conflict Investigator is an active, different workflow. A seller edit updates readiness without spending another model call. Each run records role, version, tool outcomes, usage and timing; owner-protected history excludes private reasoning.
 
@@ -82,9 +110,27 @@ flowchart LR
     Views --> Confirm["Seller confirms appointment"]
 ```
 
-In **Orders → Sandbox orders**, open **Assistant**. Type an order question or choose **Review orders** / **Plan pickups**. Each recommendation shows the order, verified facts and **Approve / Reject** buttons. Approving a pickup saves its exact proposed time after current server checks; other approvals open the order so the seller can complete the task. Rejection records a dismissal. Default grid advice is deterministic. In **Pickup schedule**, save opening dates, then **Suggest pickup plan with Gemini** → **Review appointment** → **Confirm appointment**. Blue timeline events are unsaved proposals. The server computes times and rejects stale or overlapping changes; buyers see only saved appointments. Sample orders and the saved demo chat make no AI calls. Its isolated preparation walkthrough supports local Approve / Reject practice; see [recording and reliability notes](docs/restorecart/SAMPLE_CHAT_AND_RELIABILITY.md).
+In **Orders → Sandbox orders**, use the **Table** to find an order. **Schedule pickup** or **Reschedule pickup** opens its editor in **Pickup schedule**. The schedule shows all saved appointments for the selected shop and order set, even when the table was filtered. The shortcut focuses one order while keeping the other appointments visible. Click an appointment in Bryntum to open the same editor, or drag its block to propose a new time. The blue block previews the draft until it is confirmed. Expand **Appointment list** for the keyboard-friendly list view. Enter a time or choose **Find next available time**, then choose **Confirm pickup**. The server checks for stale appointments and overlaps before saving. Save opening dates from **Pickup schedule**.
+
+In **Assistant**, choose **Plan pickups** for Gemini recommendations and **Review in schedule** to bring a proposal into the editor. Approval for other recommendations opens the order. Rejection records a dismissal. Sample orders and saved demo chat use their separate replay flow. [Recording and reliability notes](docs/restorecart/SAMPLE_CHAT_AND_RELIABILITY.md).
 
 [Implementation, tools and measured checks](docs/restorecart/AGENT_IMPLEMENTATION_REPORT.md) · [Controlled agent tests](tests/restorecart-agents.test.ts) · [Actual Gemini evaluation](tests/evidence/restorecart-live-agents.json).
+
+### Check what is blocking recovery
+
+In **Orders → Sandbox orders → Assistant**, choose **Check recovery** or ask “What’s blocking my shop recovery?” After you stop new checkouts, the assistant lists unresolved PayPal captures or refunds and links to the corresponding orders. For example, if PayPal is still checking a refund, open the flagged order and check the payment status before retrying the recovery preview.
+
+The assistant and recovery preview use the [same server payment checks](server/restorecart/continuity.ts). [The Operations Agent](server/restorecart/operationsAgent.ts) can use one Gemini call to prioritize an order when there are multiple blockers. The server supplies the status and next step, with the same guidance available if Gemini is unavailable. Opening the order only navigates to its details. The assistant does not change payments, orders, stock or the original-store file. Run the recovery preview to check the original-store records after resolving any payment blockers.
+
+Run the [focused recovery triage test](tests/restorecart-agents.test.ts) with controlled Gemini responses and no PayPal or Gemini credentials:
+
+```sh
+NODE_ENV=test node --import tsx --test --test-name-pattern="Recovery triage" tests/restorecart-agents.test.ts
+```
+
+### Review PayPal evidence
+
+In the seller’s order details, expand **Payments & history** to see recorded checkout and capture events, evidence, and verification details. **Check PayPal again** refreshes the provider status, and **Explain with Gemini** explains the recorded facts. Fulfillment and refund controls remain in order details. The pickup link opens the shared schedule editor.
 
 ## Seller PayPal connection
 
@@ -101,8 +147,8 @@ The core import → review → publish → checkout → recovery flow stays the 
 | Improvement | How to use it |
 | --- | --- |
 | Seller decision history | Use a field-level suggestion or choose **Keep current value**, then save the product. Expand **Seller decision history** to see accepted, rejected or overridden suggestions, final values, supporting source hashes, seller and timestamp. Clicking alone does not record a saved decision. |
-| AG Grid order workspace | In Orders, use search, the status filter or the Table / Pickup schedule selector. The table shows Order, Items, Status, Next action and Total. Open Table options for CSV export or extra financial and pickup columns. |
-| Bryntum pickup planning | In Orders → Pickup schedule, save opening dates, find the next available slot and confirm it. Dragging an eligible appointment proposes a change; **Confirm appointment** saves it. Keyboard-accessible forms provide the same rescheduling path. Click an appointment to open its order. |
+| AG Grid order workspace | In Orders, use search, the status filter or the Table / Pickup schedule selector. The table shows Order, Items, Status, Next action and Total. **Needs attention** isolates payment checks and pickup conflicts. Choose **Reschedule pickup** in the row to focus the affected appointment. Open Table options for CSV export or extra financial and pickup columns. |
+| Bryntum pickup planning | In Orders → Pickup schedule, save opening dates, find the next available slot and confirm it. Dragging an eligible appointment proposes a change; **Confirm pickup** saves it. Keyboard-accessible forms provide the same rescheduling path. Click an eligible appointment to open its editor. For a buyer conflict, choose **Find next available time**, review the proposal, then confirm it. |
 | Payment and stock safeguards | Server checks reject overlapping appointments, outdated edits and ineligible orders. Buyer receipts show saved pickup changes. Concurrent checkout, repeated capture/refund notifications and interrupted refunds have automated regression coverage. |
 
 The schedule supports one counter and one opening window per date, in a fixed shop time zone. Dates crossing midnight are not supported. Sample orders remain separate, read-only examples and never change payments, stock or recovery. AG Grid uses Community features; AG Studio is not required. Bryntum remains an optional evaluation dependency with an appointment-list fallback; see [setup and licensing limits](docs/restorecart/BRYNTUM_SETUP.md).

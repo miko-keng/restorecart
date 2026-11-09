@@ -220,6 +220,22 @@ function validateOriginal(input: unknown) {
     fail("Refunds cannot exceed captured amounts.");
   return o;
 }
+export function recoveryPaymentBlockers(db: DB, id: string) {
+  const pending = db
+    .prepare(
+      "SELECT id FROM rc_orders WHERE incident=? AND state IN ('capture_requested','pending','needs_reconciliation') ORDER BY id",
+    )
+    .all(id) as { id: string }[];
+  const refunds = db
+    .prepare(
+      "SELECT r.order_id AS id FROM rc_refunds r JOIN rc_orders o ON o.id=r.order_id WHERE o.incident=? AND r.state='checking' ORDER BY r.order_id",
+    )
+    .all(id) as { id: string }[];
+  return [
+    ...pending.map(({ id }) => ({ orderId: id, kind: "capture" as const })),
+    ...refunds.map(({ id }) => ({ orderId: id, kind: "refund" as const })),
+  ];
+}
 export function reconciliation(db: DB, id: string, input: unknown) {
   const i = incident(db, id),
     original = validateOriginal(input);
@@ -228,17 +244,7 @@ export function reconciliation(db: DB, id: string, input: unknown) {
       "Close new checkouts before comparing the return to your original store.",
       409,
     );
-  const pending = db
-    .prepare(
-      "SELECT id FROM rc_orders WHERE incident=? AND state IN ('capture_requested','pending','needs_reconciliation')",
-    )
-    .all(id);
-  const refunds = db
-    .prepare(
-      "SELECT r.order_id FROM rc_refunds r JOIN rc_orders o ON o.id=r.order_id WHERE o.incident=? AND r.state='checking'",
-    )
-    .all(id);
-  if (pending.length || refunds.length)
+  if (recoveryPaymentBlockers(db, id).length)
     fail("Resolve pending payments and refunds before reconciliation.", 409);
   const saved = meta(db, `destination:${original.storeId}`, null);
   if (

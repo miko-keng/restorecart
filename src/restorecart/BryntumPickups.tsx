@@ -9,17 +9,25 @@ export default function BryntumPickups({
   onSelect,
   onPropose,
   proposals = [],
-  onProposalSelect,
+  openingWindows = [],
+  height = 300,
 }: {
   orders: any[];
+  height?: number;
   onSelect?: (id: string) => void;
   onPropose?: (id: string, start: string, end: string) => void;
   proposals?: { orderId: string; start: string; end: string }[];
-  onProposalSelect?: (id: string) => void;
+  openingWindows?: PickupRange[];
 }) {
   const key = JSON.stringify([
-    orders.map((o) => [o.id, o.pickupWindow, o.fulfillment]),
+    orders.map((o) => [
+      o.id,
+      o.pickupWindow,
+      o.fulfillment,
+      o.pickupNeedsReschedule,
+    ]),
     proposals,
+    !!onPropose,
   ]);
   const project = useMemo(
     () => ({
@@ -27,7 +35,7 @@ export default function BryntumPickups({
       events: [
         ...orders.map((o) => ({
           id: o.id,
-          name: `Order ${o.id.slice(-8)} · ${o.fulfillment === "ready" ? "Ready" : o.fulfillment === "collected" ? "Collected" : "Preparing"}`,
+          name: `Order ${o.id.slice(-8)} · ${o.pickupNeedsReschedule ? "Reschedule" : o.fulfillment === "ready" ? "Ready" : o.fulfillment === "collected" ? "Collected" : "Preparing"}`,
           startDate: new Date(o.pickupWindow.start),
           endDate: new Date(o.pickupWindow.end),
           manuallyScheduled: true,
@@ -36,7 +44,11 @@ export default function BryntumPickups({
             !o.sample &&
             o.fulfillment !== "collected" &&
             o.refund?.state !== "checking",
-          eventColor: o.fulfillment === "ready" ? "green" : "orange",
+          eventColor: o.pickupNeedsReschedule
+            ? "red"
+            : o.fulfillment === "ready"
+              ? "green"
+              : "orange",
         })),
         ...proposals.map((p) => ({
           id: `proposal:${p.orderId}`,
@@ -63,16 +75,25 @@ export default function BryntumPickups({
     }),
     [key],
   );
-  const start =
-      Math.min(
-        ...orders.map((o) => Date.parse(o.pickupWindow.start)),
-        ...proposals.map((p) => Date.parse(p.start)),
-      ) - 1800000,
-    end =
-      Math.max(
-        ...orders.map((o) => Date.parse(o.pickupWindow.end)),
-        ...proposals.map((p) => Date.parse(p.end)),
-      ) + 1800000;
+  const starts = orders.map((order) => Date.parse(order.pickupWindow.start));
+  const ends = orders.map((order) => Date.parse(order.pickupWindow.end));
+  const nearbyWindows = openingWindows.filter((window) =>
+    starts.some(
+      (start) =>
+        start >= Date.parse(window.start) && start < Date.parse(window.end),
+    ),
+  );
+  const padding = onPropose ? 2 * 60 * 60000 : 30 * 60000;
+  const start = Math.min(
+    ...starts.map((time) => time - padding),
+    ...nearbyWindows.map((window) => Date.parse(window.start)),
+    ...proposals.map((proposal) => Date.parse(proposal.start)),
+  );
+  const end = Math.max(
+    ...ends.map((time) => time + padding),
+    ...nearbyWindows.map((window) => Date.parse(window.end)),
+    ...proposals.map((proposal) => Date.parse(proposal.end)),
+  );
   return (
     <div className="rc-pickup-timeline">
       <BryntumSchedulerPro
@@ -80,19 +101,23 @@ export default function BryntumPickups({
         project={project as any}
         startDate={new Date(start)}
         endDate={new Date(end)}
-        height={300}
-        viewPreset="hourAndDay"
+        height={height}
+        viewPreset={
+          onPropose
+            ? {
+                base: "hourAndDay",
+                timeResolution: { unit: "minute", increment: 5 },
+              }
+            : "hourAndDay"
+        }
         readOnly={!onPropose}
-        onEventClick={({ eventRecord }: any) =>
-          String(eventRecord.id).startsWith("proposal:")
-            ? onProposalSelect?.(String(eventRecord.id).slice(9))
-            : onSelect?.(String(eventRecord.id))
-        }
+        onEventClick={({ eventRecord }) => {
+          const id = String(eventRecord.id);
+          if (!id.startsWith("proposal:")) onSelect?.(id);
+        }}
         onBeforeEventDelete={() => false}
-        onBeforeEventDrag={({ eventRecord }: any) =>
-          eventRecord.draggable !== false
-        }
-        onBeforeEventDropFinalize={({ context }: any) => {
+        onBeforeEventDrag={({ eventRecord }) => eventRecord.draggable !== false}
+        onBeforeEventDropFinalize={({ context }) => {
           context.async = true;
           // Keep the persisted position until the seller confirms and the server accepts it.
           const id = String(context.eventRecord.id),
@@ -110,7 +135,111 @@ export default function BryntumPickups({
         onBeforeEventAdd={() => false}
         eventDragCreateFeature={false}
         eventResizeFeature={false}
-        columns={[{ text: "Resource", field: "name", width: 160 }]}
+        columns={[{ text: "Counter", field: "name", width: 118 }]}
+      />
+    </div>
+  );
+}
+
+type PickupRange = { start: string; end: string };
+export function BuyerBlockTimeline({
+  day,
+  appointment,
+  blocks,
+  disabled,
+  onDraft,
+}: {
+  day: string;
+  appointment?: PickupRange | null;
+  blocks: PickupRange[];
+  disabled: boolean;
+  onDraft: (range: PickupRange) => void;
+}) {
+  const startDate = new Date(`${day}T00:00`);
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + 1);
+  const anchor = appointment
+    ? new Date(appointment.start)
+    : new Date(startDate);
+  if (anchor < startDate || anchor >= endDate || !appointment) {
+    anchor.setTime(+startDate);
+    anchor.setHours(12);
+  }
+  const key = JSON.stringify([day, appointment, blocks]);
+  const project = useMemo(() => {
+    const events = [
+      ...(appointment
+        ? [
+            {
+              ...appointment,
+              id: "pickup",
+              resource: "pickup",
+              name: "Your appointment",
+              eventColor: "green",
+            },
+          ]
+        : []),
+      ...blocks.map((block, index) => ({
+        ...block,
+        id: `blocked:${index}`,
+        resource: "blocked",
+        name: "Unavailable",
+        eventColor: "gray",
+      })),
+    ];
+    return {
+      resources: [
+        { id: "pickup", name: "Pickup" },
+        { id: "blocked", name: "Unavailable" },
+      ],
+      events: events.map(({ id, name, start, end, eventColor }) => ({
+        id,
+        name,
+        startDate: new Date(start),
+        endDate: new Date(end),
+        eventColor,
+        manuallyScheduled: true,
+        draggable: false,
+      })),
+      assignments: events.map(({ id, resource }) => ({
+        id,
+        eventId: id,
+        resourceId: resource,
+      })),
+    };
+  }, [key]);
+  return (
+    <div className="rc-buyer-pickup-timeline">
+      <BryntumSchedulerPro
+        key={key}
+        project={project as any}
+        visibleDate={{ date: anchor, block: "center" }}
+        startDate={startDate}
+        endDate={endDate}
+        height={190}
+        rowHeight={48}
+        viewPreset="hourAndDay"
+        columns={[{ text: "Schedule", field: "name", width: 110 }]}
+        eventEditFeature={false}
+        taskEditFeature={false}
+        eventMenuFeature={false}
+        scheduleMenuFeature={false}
+        eventDragFeature={false}
+        eventResizeFeature={false}
+        onBeforeEventDelete={() => false}
+        onBeforeDragCreate={({ resourceRecord }) =>
+          !disabled && resourceRecord.id === "blocked"
+        }
+        onBeforeDragCreateFinalize={({ context }) => {
+          context.async = true;
+          const { startDate, endDate } = context;
+          context.finalize(false);
+          if (!disabled && startDate < endDate)
+            onDraft({
+              start: startDate.toISOString(),
+              end: endDate.toISOString(),
+            });
+        }}
       />
     </div>
   );

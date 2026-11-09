@@ -1,3 +1,12 @@
+export function canSchedulePickup(order: any) {
+  return (
+    order.state === "paid" &&
+    !!order.capture &&
+    !order.refunded &&
+    order.fulfillment !== "collected" &&
+    order.refund?.state !== "checking"
+  );
+}
 export type OrderAction =
   "check_payment" | "prepare" | "schedule_pickup" | "notify_pickup" | "none";
 export function allowedOrderActions(o: any): OrderAction[] {
@@ -12,7 +21,8 @@ export function allowedOrderActions(o: any): OrderAction[] {
   if (o.state !== "paid" || (!o.capture && !o.sample)) return ["check_payment"];
   const result: OrderAction[] = [];
   if (o.fulfillment !== "ready") result.push("prepare");
-  if (!o.pickupWindow) result.push("schedule_pickup");
+  if (!o.pickupWindow || o.pickupNeedsReschedule)
+    result.push("schedule_pickup");
   if (o.fulfillment === "ready") result.push("notify_pickup");
   return result.length ? result : ["none"];
 }

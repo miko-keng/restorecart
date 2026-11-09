@@ -1,3 +1,4 @@
+import { NewShops, type NewShop } from "./BuyerDiscovery";
 import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import {
@@ -87,11 +88,13 @@ export function EntryPage() {
 
 export function ShopDirectory({
   loadShops,
+  newShops,
   renderArt,
   addToBasket,
   busy = false,
 }: {
   loadShops: () => Promise<DirectoryShop[]>;
+  newShops?: NewShop[];
   addToBasket?: (slug: string, sku: string) => Promise<any>;
   busy?: boolean;
   renderArt: (shop: DirectoryShop, product?: DirectoryProduct) => ReactNode;
@@ -170,6 +173,7 @@ export function ShopDirectory({
           <ShoppingBag size={17} /> Pickup only · PayPal sandbox
         </span>
       </div>
+      {newShops && <NewShops shops={newShops} />}
       <label className="rc-shop-search">
         <Search size={20} />
         <span className="rc-sr">Search shops and products</span>

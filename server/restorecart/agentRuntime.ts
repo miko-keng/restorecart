@@ -24,6 +24,7 @@ export const AGENT_ROLES = [
       "inspectPickupAvailability",
       "findPickupSlots",
       "proposeOperations",
+      "focusRecoveryBlocker",
     ],
     permissions: ["read_selected_shop_orders", "propose_actions_and_slots"],
   },
@@ -103,6 +104,7 @@ export async function runAgent(input: {
   images?: any[];
   budget: AgentBudget;
   transport?: typeof fetch;
+  accountId?: string;
 }) {
   const started = Date.now(),
     trace: any[] = [],
@@ -118,7 +120,7 @@ export async function runAgent(input: {
   ];
   while (input.budget.remaining > 0) {
     input.budget.claimCall();
-    claimGeminiCall(input.db, input.id);
+    claimGeminiCall(input.db, input.id, input.accountId);
     const requestAt = Date.now();
     const allowed = new Set(
       input.tools.filter((t) => !t.enabled || t.enabled()).map((t) => t.name),

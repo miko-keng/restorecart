@@ -209,6 +209,7 @@ export function publish(db: DB, id: string, expected: number) {
     ).run(id);
     i.revision++;
     i.state = "live";
+    if (!i.published) i.firstPublishedAt = Date.now();
     i.published = {
       revision: i.revision,
       products: structuredClone(products),

@@ -1,9 +1,21 @@
 import type { TrackableOrder } from "./orderStatus";
-export function matchesOrderFilter(
-  o: TrackableOrder & { refund?: { state?: string } },
-  filter: string,
-) {
+type AttentionOrder = TrackableOrder & {
+  refund?: { state?: string };
+  pickupNeedsReschedule?: boolean;
+};
+export function pickupConflict(o: AttentionOrder) {
+  return (
+    !!o.pickupNeedsReschedule &&
+    o.state === "paid" &&
+    !o.refunded &&
+    o.refund?.state !== "checking" &&
+    o.fulfillment !== "collected"
+  );
+}
+export function matchesOrderFilter(o: AttentionOrder, filter: string): boolean {
   if (filter === "All") return true;
+  if (filter === "Needs attention")
+    return pickupConflict(o) || matchesOrderFilter(o, "Payment checking");
   if (filter === "Payment checking")
     return (
       !["paid", "failed", "canceled"].includes(o.state) ||

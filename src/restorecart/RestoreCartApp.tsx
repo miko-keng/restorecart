@@ -1,3 +1,4 @@
+import { BuyerPickupTimes, BuyerSearch, type NewShop } from "./BuyerDiscovery";
 import { readApiResponse } from "./apiResponse";
 import { preferredShop } from "./selection";
 import { OrderProgress } from "./OrderProgress";
@@ -11,7 +12,15 @@ import {
   RecoveryPanel,
   KitPanel,
 } from "./Continuity";
-import { useEffect, useState, useRef, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useState,
+  useRef,
+  type ReactNode,
+} from "react";
+import { OrderViewBoundary } from "./OrderViewBoundary";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import {
   ArrowRight,
@@ -43,6 +52,8 @@ import {
 import "./style.css";
 import "./polish.css";
 import { EntryPage, ShopDirectory } from "./PublicPages";
+
+const ReceiptPickupTimeline = lazy(() => import("./BryntumPickups"));
 
 let csrf = "";
 async function api(path: string, body?: unknown, method?: string) {
@@ -241,6 +252,40 @@ export default function RestoreCartApp() {
     setSession(s);
     return s;
   }
+  const buyerId =
+    session?.user?.role === "buyer" ? (session.user.id as string) : undefined;
+  const [discovery, setDiscovery] = useState<{
+    buyerId: string;
+    shops: NewShop[];
+  }>();
+  const [dismissedBatch, setDismissedBatch] = useState("");
+  useEffect(() => {
+    if (!buyerId) return;
+    let active = true;
+    const refresh = () => {
+      void api("/buyer/new-shops")
+        .then((shops) => {
+          if (active) setDiscovery({ buyerId, shops });
+        })
+        .catch(() => {});
+    };
+    refresh();
+    window.addEventListener("rc-shop-visited", refresh);
+    return () => {
+      active = false;
+      window.removeEventListener("rc-shop-visited", refresh);
+    };
+  }, [buyerId, path]);
+  const newShops =
+    buyerId && discovery?.buyerId === buyerId ? discovery.shops : undefined;
+  const batch = JSON.stringify(
+    (newShops || []).map((shop) => shop.slug).sort(),
+  );
+  const showShopBanner =
+    !!newShops?.length &&
+    dismissedBatch !== `${buyerId}:${batch}` &&
+    localStorage.getItem(`rc-dismissed-new-shops:${buyerId}`) !== batch;
+
   async function authenticated() {
     setCurrent(null);
     setIncidents([]);
@@ -536,6 +581,26 @@ export default function RestoreCartApp() {
             {notice}
           </div>
         )}
+        {isDirectory && showShopBanner && (
+          <div className="rc-notice">
+            <a href="/restorecart/shops#new-shops">
+              {newShops!.length} new {newShops!.length === 1 ? "shop" : "shops"}{" "}
+              to explore
+            </a>
+            <button
+              className="rc-link"
+              onClick={() => {
+                localStorage.setItem(
+                  `rc-dismissed-new-shops:${buyerId}`,
+                  batch,
+                );
+                setDismissedBatch(`${buyerId}:${batch}`);
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
         {isBasket ? (
           <Basket
             api={api}
@@ -559,6 +624,7 @@ export default function RestoreCartApp() {
         ) : isDirectory ? (
           <ShopDirectory
             loadShops={() => api("/shops")}
+            newShops={newShops}
             busy={!!busy}
             addToBasket={(slug, sku) =>
               run("Adding to basket", async () => {
@@ -591,6 +657,7 @@ export default function RestoreCartApp() {
           <Shop
             key={`${path}:${session.user?.id || "guest"}`}
             slug={decodeURIComponent(path.split("/")[2])}
+            signedInBuyer={!!buyerId}
             ready={session.paypalReady}
             go={go}
             run={run}
@@ -718,6 +785,22 @@ export default function RestoreCartApp() {
             </motion.div>
           )}
         </AnimatePresence>
+        {(isEntry ||
+          isDirectory ||
+          isShop ||
+          isBasket ||
+          isAccount ||
+          isReceipt) && (
+          <BuyerSearch
+            key={buyerId ?? "guest"}
+            search={
+              buyerId
+                ? (question, previousQuestion) =>
+                    api("/buyer/search-agent", { question, previousQuestion })
+                : undefined
+            }
+          />
+        )}
         {isSeller && evidence && (
           <div className="rc-modal-backdrop" onClick={() => setEvidence(null)}>
             <section
@@ -766,12 +849,14 @@ export default function RestoreCartApp() {
 
 function Shop({
   slug,
+  signedInBuyer,
   ready,
   go,
   run,
   busy,
 }: {
   slug: string;
+  signedInBuyer: boolean;
   ready: boolean;
   go: (p: string) => void;
   run: (l: string, f: () => Promise<any>) => Promise<void>;
@@ -792,6 +877,10 @@ function Shop({
       .then((shop) => {
         if (!alive) return;
         setShop(shop);
+        if (signedInBuyer)
+          void api(`/shops/${encodeURIComponent(slug)}/visit`, {})
+            .then(() => window.dispatchEvent(new Event("rc-shop-visited")))
+            .catch(() => {});
         const target = decodeURIComponent(location.hash.slice(1));
         const selected = shop.products.find(
           (p: any) => `product-${p.sku}` === target && p.available > 0,
@@ -1050,7 +1139,8 @@ function Receipt({
   busy: string;
 }) {
   const [o, setOrder] = useState<any>(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [showTimeline, setShowTimeline] = useState(false);
   const access = new URLSearchParams(location.search).get("access") || "";
   const query = `?access=${encodeURIComponent(access)}`;
   const refresh = async () => {
@@ -1069,9 +1159,9 @@ function Receipt({
             (v) => alive && setOrder(v),
           );
         } else if (!["paid", "failed", "canceled"].includes(data.state)) {
-          await api(`/orders/${id}/check${query}`, {}).then(
-            (v) => alive && setOrder(v),
-          );
+          await api(`/orders/${id}/check${query}`, {});
+          const updated = await api(`/orders/${id}${query}`);
+          if (alive) setOrder(updated);
         }
       })
       .catch((e) => alive && setError(e.message));
@@ -1099,38 +1189,64 @@ function Receipt({
         </p>
       </main>
     );
-  const paid = o.state === "paid",
-    title = o.refunded
-      ? "A financial adjustment was recorded."
-      : paid
-        ? "A little order. A big thank you."
-        : o.state === "canceled"
-          ? "Your checkout was canceled."
-          : o.state === "failed"
-            ? "Payment did not complete."
-            : "Let’s check your payment.";
+  const paid = o.state === "paid";
+  const timelineEnabled =
+    import.meta.env.VITE_ENABLE_BRYNTUM === "true" ||
+    (import.meta.env.DEV && import.meta.env.VITE_ENABLE_BRYNTUM !== "false");
+  const canBlock =
+    paid &&
+    !o.refunded &&
+    o.refund?.state !== "checking" &&
+    o.fulfillment !== "collected" &&
+    Array.isArray(o.buyerPickupBlocks);
   return (
     <main className="rc-receipt">
-      <div className={`rc-receipt-symbol ${paid ? "paid" : ""}`}>
-        {paid ? <CheckCircle2 size={38} /> : <ShoppingBag size={38} />}
-      </div>
-      <Pill kind={paid ? "green" : ""}>{o.state.replaceAll("_", " ")}</Pill>
-      <h1>{title}</h1>
-      <p>
-        {paid && !o.refunded
-          ? "Your PayPal sandbox payment is verified. Keep this receipt for pickup."
-          : "This page reflects the server’s payment record. Approval alone does not mean payment is complete."}
-      </p>
+      <h1>Order receipt</h1>
       {error && (
         <p role="alert" className="rc-warning">
           {error}
         </p>
       )}
-      <OrderProgress order={o} />
-      <p>
-        Pickup status refreshes automatically. Keep this receipt link, or return
-        through Your orders.
-      </p>
+      <OrderProgress order={o} compact />
+      {!canBlock && o.pickupWindow && timelineEnabled && (
+        <details
+          className="rc-panel"
+          onToggle={(event) => setShowTimeline(event.currentTarget.open)}
+        >
+          <summary>View pickup timeline</summary>
+          {showTimeline && (
+            <OrderViewBoundary
+              fallback={
+                <p role="status">
+                  The timeline is unavailable. Your appointment time is shown
+                  above.
+                </p>
+              }
+            >
+              <Suspense
+                fallback={<p role="status">Loading pickup timeline…</p>}
+              >
+                <ReceiptPickupTimeline orders={[o]} height={175} />
+              </Suspense>
+            </OrderViewBoundary>
+          )}
+        </details>
+      )}
+      {canBlock && (
+        <BuyerPickupTimes
+          blocks={o.buyerPickupBlocks}
+          appointment={o.pickupWindow}
+          timelineEnabled={timelineEnabled}
+          needsReschedule={o.pickupNeedsReschedule}
+          change={async (operation, window) => {
+            const update = await api(`/orders/${id}/pickup-blocks`, {
+              operation,
+              window,
+            });
+            setOrder((order: any) => ({ ...order, ...update }));
+          }}
+        />
+      )}
       <section className="rc-panel">
         <div className="rc-orderhead">
           <h2>{o.snapshot.name}</h2>
@@ -1148,14 +1264,6 @@ function Receipt({
           <span>
             Order <code>{o.id.slice(-12)}</code>
           </span>
-          <span>
-            Pickup <b>{o.fulfillment.replaceAll("_", " ")}</b>
-          </span>
-          {o.capture && (
-            <span>
-              Sandbox capture <code>{o.capture}</code>
-            </span>
-          )}
           {o.refunded > 0 && (
             <span>
               Financial adjustments <b>{dollars(o.refunded)}</b>
@@ -1170,18 +1278,22 @@ function Receipt({
           </div>
         </div>
         <div className="rc-buttonrow">
-          <button
-            className="rc-button secondary"
-            disabled={!!busy}
-            onClick={() =>
-              run("Checking payment status", async () => {
-                setOrder(await api(`/orders/${id}/check${query}`, {}));
-              })
-            }
-          >
-            <RefreshCw size={16} />
-            Check payment status
-          </button>
+          {(!paid || o.refund?.state === "checking") &&
+            !["failed", "canceled"].includes(o.state) && (
+              <button
+                className="rc-button secondary"
+                disabled={!!busy}
+                onClick={() =>
+                  run("Checking payment status", async () => {
+                    await api(`/orders/${id}/check${query}`, {});
+                    await refresh();
+                  })
+                }
+              >
+                <RefreshCw size={16} />
+                Check payment status
+              </button>
+            )}
           {o.state === "awaiting_buyer" && o.snapshot.approvalUrl && (
             <a className="rc-button" href={o.snapshot.approvalUrl}>
               Continue to PayPal
@@ -1203,13 +1315,29 @@ function Receipt({
           )}
         </div>
       </section>
-      <button
-        className="rc-link"
-        onClick={() => go(o.shopUrl || "/restorecart/shops")}
+      {o.capture && (
+        <details className="rc-receipt-payment">
+          <summary>Payment details</summary>
+          <p>
+            PayPal sandbox reference <code>{o.capture}</code>
+          </p>
+        </details>
+      )}
+      <nav
+        className="rc-buttonrow rc-receipt-links"
+        aria-label="Receipt navigation"
       >
-        Back to shop
-        <ArrowRight size={16} />
-      </button>
+        <a className="rc-link" href="/restorecart/account">
+          Your orders
+        </a>
+        <button
+          className="rc-link"
+          onClick={() => go(o.shopUrl || "/restorecart/shops")}
+        >
+          Back to shop
+          <ArrowRight size={16} />
+        </button>
+      </nav>
     </main>
   );
 }

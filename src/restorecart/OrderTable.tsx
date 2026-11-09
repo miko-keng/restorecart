@@ -1,4 +1,8 @@
-import { nextOrderAction, allowedOrderActions } from "./orderAdvice";
+import {
+  nextOrderAction,
+  allowedOrderActions,
+  canSchedulePickup,
+} from "./orderAdvice";
 import { useMemo, useState, useRef } from "react";
 import { AgGridReact } from "ag-grid-react";
 import {
@@ -8,16 +12,19 @@ import {
   type ColDef,
 } from "ag-grid-community";
 import { safeCsvCell } from "./orderOperations";
+import { pickupConflict } from "./orderExamples";
 import { orderProgress } from "./orderStatus";
 ModuleRegistry.registerModules([AllCommunityModule]);
 export default function OrderTable({
   orders,
   onSelect,
+  onOpenPickup,
   storageKey,
   plan,
 }: {
   orders: any[];
   onSelect: (id: string) => void;
+  onOpenPickup: (id: string) => void;
   storageKey?: string;
   plan?: any;
 }) {
@@ -37,12 +44,18 @@ export default function OrderTable({
       );
     } catch {}
   };
+  const pickupAction = (order: any) =>
+    canSchedulePickup(order) && (!order.pickupWindow || pickupConflict(order))
+      ? order.pickupWindow
+        ? "Reschedule pickup"
+        : "Schedule pickup"
+      : null;
   const columns = useMemo<ColDef[]>(
     () => [
       {
         headerName: "Order",
         field: "id",
-        minWidth: 160,
+        minWidth: 110,
         valueFormatter: (p) =>
           p.data?.sample
             ? `Sample ${String(p.value).split("-").pop()}`
@@ -51,7 +64,7 @@ export default function OrderTable({
       {
         headerName: "Items",
         colId: "items",
-        minWidth: 220,
+        minWidth: 150,
         valueGetter: (p) =>
           (p.data?.snapshot?.lines || [])
             .map((l: any) => `${l.quantity} × ${l.name}`)
@@ -61,14 +74,34 @@ export default function OrderTable({
         headerName: "Status",
         colId: "status",
         valueGetter: (p) => (p.data ? orderProgress(p.data).label : ""),
-        minWidth: 165,
+        minWidth: 115,
       },
       {
         headerName: "Next action",
         colId: "nextAction",
-        minWidth: 210,
+        minWidth: 170,
+        cellClass: "rc-order-action-cell",
+        cellRenderer: (p: any) =>
+          p.data && pickupAction(p.data) ? (
+            <button
+              type="button"
+              className="rc-pickup-conflict-link"
+              onClick={() => onOpenPickup(p.data.id)}
+            >
+              {p.value}
+            </button>
+          ) : (
+            p.value
+          ),
+        cellRendererParams: {
+          suppressMouseEventHandling: (p: any) =>
+            p.event.target instanceof Element &&
+            !!p.event.target.closest("button"),
+        },
         valueGetter: (p) => {
           if (!p.data) return "";
+          const pickup = pickupAction(p.data);
+          if (pickup) return pickup;
           const recommended = plan?.actions?.find(
             (a: any) =>
               a.orderId === p.data.id &&
@@ -83,7 +116,7 @@ export default function OrderTable({
         valueGetter: (p) => (p.data?.amount || 0) / 100,
         filter: "agNumberColumnFilter",
         valueFormatter: (p) => `$${Number(p.value).toFixed(2)}`,
-        minWidth: 125,
+        minWidth: 105,
       },
       {
         headerName: "Refunded USD",
@@ -134,7 +167,7 @@ export default function OrderTable({
         ),
       },
     ],
-    [onSelect, plan],
+    [onSelect, onOpenPickup, plan],
   );
   return (
     <div>
@@ -223,10 +256,24 @@ export default function OrderTable({
           onColumnResized={(e) => {
             if (e.finished) persist(e.api);
           }}
-          onRowClicked={(event) => event.data && onSelect(event.data.id)}
-          onCellKeyDown={(event) => {
-            if ((event.event as KeyboardEvent)?.key === "Enter" && event.data)
+          onRowClicked={(event) => {
+            if (event.data && !event.isEventHandlingSuppressed)
               onSelect(event.data.id);
+          }}
+          onCellKeyDown={(event) => {
+            if (
+              (event.event as KeyboardEvent)?.key !== "Enter" ||
+              !event.data ||
+              event.event?.target instanceof HTMLButtonElement
+            )
+              return;
+            if (
+              "column" in event &&
+              event.column.getColId() === "nextAction" &&
+              pickupAction(event.data)
+            )
+              onOpenPickup(event.data.id);
+            else onSelect(event.data.id);
           }}
           columnDefs={columns}
           defaultColDef={{
